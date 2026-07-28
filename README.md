@@ -1,8 +1,10 @@
 # Coloriage par numéros (Color by Number)
 
-Application web de coloriage par numéros. L'utilisateur sélectionne une couleur
-dans la palette, puis tape sur les cases portant le numéro correspondant pour les
-remplir et reconstituer le dessin.
+Application web de coloriage par numéros. Chaque dessin est **vectoriel** : un
+ensemble de **régions** (formes courbes délimitées par un contour), chacune
+portant un numéro de couleur. L'utilisateur choisit une couleur, puis tape les
+régions correspondantes pour reconstituer une illustration soignée, avec du
+relief donné par les dégradés de tons.
 
 ## Lancer le projet
 
@@ -15,41 +17,41 @@ npm run preview  # prévisualiser le build
 
 ## Fonctionnalités
 
-- **Écran de sélection** : plusieurs dessins classés par difficulté (Facile →
-  Expert), avec aperçu, taille et progression enregistrée.
-- **Grille numérotée** : chaque case affiche son numéro tant qu'elle n'est pas remplie.
-- **Palette** : chaque couleur affiche son numéro et une jauge de progression (`done/total`).
-- **Sélection de couleur active** : tap sur une case du bon numéro → remplissage ;
-  mauvais numéro → petit feedback (secousse).
-- **Zoom & déplacement** : molette, **pincement tactile à deux doigts**, glisser,
-  boutons de zoom. Les grands dessins sont **ajustés automatiquement** à l'écran.
-- **Grisage des couleurs terminées** dans la palette (avec ✓).
+- **Écran de sélection** : dessins classés par difficulté (Facile → Expert),
+  avec aperçu, nombre de zones et progression enregistrée.
+- **Régions à colorier** : tant qu'une zone n'est pas remplie, elle affiche son
+  contour et un petit numéro ; une fois coloriée, elle prend sa couleur.
+- **Palette** : chaque couleur affiche son numéro et une jauge de progression
+  (`fait/total`) ; une couleur terminée est grisée avec un ✓.
+- **Sélection de couleur active** : taper une zone du bon numéro la remplit ;
+  mauvais numéro → petit feedback (clignotement du contour).
+- **Zoom & déplacement** : molette, **pincement tactile à deux doigts**, glisser.
+  Le dessin est **ajusté automatiquement** à l'écran (fit-to-view).
 - **Sauvegarde automatique** de la progression, indépendante par dessin (localStorage).
 - **Animation de célébration** à 100 %.
 
 ## Dessins disponibles
 
-| Dessin       | Difficulté | Taille | Cases |
-|--------------|------------|--------|-------|
-| Petite fleur | Facile     | 10×10  | 100   |
-| Cœur         | Facile     | 11×11  | 121   |
-| Arc-en-ciel  | Moyen      | 18×11  | 198   |
-| Mandala      | Difficile  | 21×21  | 441   |
-| Paysage      | Expert     | 30×20  | 600   |
+| Dessin            | Difficulté | Zones |
+|-------------------|------------|-------|
+| Coucher de soleil | Facile     | 9     |
+| Tournesol         | Moyen      | 38    |
+| Montgolfière      | Moyen      | 14    |
+| Papillon          | Difficile  | 19    |
+| Rosace            | Expert     | 62    |
 
 ## Structure
 
 ```
 src/
   data/
-    builder.js              # moteur de génération de dessins (primitives graphiques)
-    puzzles.js              # catalogue des dessins par difficulté
+    svg.js                  # helpers de formes vectorielles (bande, disque, pétales…)
+    puzzles.js              # catalogue des dessins (régions SVG)
   hooks/useColorByNumber.js # logique de jeu + autosave
   components/
     PuzzleSelect.jsx        # écran d'accueil / choix du dessin
-    Game.jsx                # une partie (grille + palette + célébration)
-    Grid.jsx                # grille + zoom/pincement/déplacement + fit-to-view
-    Cell.jsx                # une case
+    Game.jsx                # une partie (canevas + palette + célébration)
+    RegionCanvas.jsx        # rendu SVG + zoom/pincement/déplacement + fit-to-view
     Palette.jsx             # palette + jauges de progression
   App.jsx                   # navigation sélection <-> partie
   main.jsx / index.css
@@ -57,14 +59,21 @@ src/
 
 ## Ajouter un dessin
 
-Dans `src/data/puzzles.js`, ajouter un objet au tableau `puzzles`. Deux options :
+Dans `src/data/puzzles.js`, ajouter un objet au tableau `puzzles` :
 
-- **Petit dessin** : fournir directement `grid` (matrice de numéros), comme
-  `fleur` ou `coeur`.
-- **Grand dessin** : utiliser `buildPuzzle({ ... , draw(ctx) })` et dessiner avec
-  les primitives `ctx.fillAll`, `ctx.rect`, `ctx.disc`, `ctx.ring`, `ctx.set`,
-  `ctx.each`, comme `mandala` ou `paysage`.
+```js
+{
+  id, name, difficulty,
+  viewBox: { w, h },
+  colors: [{ number, hex, name }],
+  regions: [{ number, d, label: { x, y } }],  // d = chemin SVG, label = position du numéro
+}
+```
+
+Les helpers de `svg.js` (`band`, `disc`, `ellipse`, `polygon`, `smoothClosed`)
+et les fabriques de `puzzles.js` (`petalRing`, `centroid`) facilitent la
+génération de formes lisses et de couronnes de pétales.
 
 ## Technique
 
-React + Vite, front-end uniquement (aucun back-end). CSS simple.
+React + Vite, front-end uniquement (aucun back-end). Dessins vectoriels en SVG.

@@ -1,28 +1,25 @@
 import { useEffect, useState } from 'react'
 import { useColorByNumber } from '../hooks/useColorByNumber.js'
-import { Grid } from './Grid.jsx'
+import { RegionCanvas } from './RegionCanvas.jsx'
 import { Palette } from './Palette.jsx'
 
 // ---------------------------------------------------------------------------
 // Une partie de coloriage pour un dessin donné.
-//
-// Ce composant est monté avec une `key` égale à l'id du dessin (voir App),
-// il repart donc d'un état propre à chaque changement de dessin.
+// Monté avec une `key` égale à l'id du dessin (voir App) : état propre à chaque
+// changement de dessin.
 // ---------------------------------------------------------------------------
 
 export function Game({ puzzle, onBack }) {
   const {
     filled,
-    flatGrid,
     activeColor,
     progress,
     isComplete,
     selectColor,
-    paintCell,
+    paintRegion,
     reset,
   } = useColorByNumber(puzzle)
 
-  // Célébration affichée une seule fois au passage à 100%.
   const [celebrate, setCelebrate] = useState(false)
   useEffect(() => {
     if (isComplete) {
@@ -50,12 +47,7 @@ export function Game({ puzzle, onBack }) {
         </div>
       </header>
 
-      <Grid
-        puzzle={puzzle}
-        filled={filled}
-        flatGrid={flatGrid}
-        onPaint={paintCell}
-      />
+      <RegionCanvas puzzle={puzzle} filled={filled} onPaint={paintRegion} />
 
       <Palette
         colors={puzzle.colors}
@@ -69,7 +61,6 @@ export function Game({ puzzle, onBack }) {
   )
 }
 
-// Confettis + message quand le dessin est terminé.
 function Celebration() {
   const pieces = Array.from({ length: 50 })
   const colors = ['#ff5d8f', '#7ed957', '#ffd166', '#4d96ff', '#c77dff', '#ff9f1c']

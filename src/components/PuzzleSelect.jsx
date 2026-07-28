@@ -37,9 +37,9 @@ export function PuzzleSelect({ onSelect }) {
 }
 
 function PuzzleCard({ puzzle, onSelect }) {
-  const done = getSavedCount(puzzle.id, puzzle.cellCount)
-  const pct = Math.round((done / puzzle.cellCount) * 100)
-  const complete = done === puzzle.cellCount
+  const done = getSavedCount(puzzle.id, puzzle.regionCount)
+  const pct = Math.round((done / puzzle.regionCount) * 100)
+  const complete = done === puzzle.regionCount
 
   return (
     <button type="button" className="card" onClick={() => onSelect(puzzle.id)}>
@@ -50,7 +50,7 @@ function PuzzleCard({ puzzle, onSelect }) {
       <div className="card__body">
         <span className="card__name">{puzzle.name}</span>
         <span className="card__meta">
-          {puzzle.width}×{puzzle.height} · {puzzle.cellCount} cases
+          {puzzle.colors.length} couleurs · {puzzle.regionCount} zones
         </span>
         <span className="card__bar">
           <span className="card__bar-fill" style={{ width: `${pct}%` }} />
@@ -61,7 +61,7 @@ function PuzzleCard({ puzzle, onSelect }) {
   )
 }
 
-// Aperçu du dessin final rendu en SVG (une case = un petit rectangle coloré).
+// Aperçu du dessin final rendu en SVG (chaque région avec sa couleur).
 function Thumbnail({ puzzle }) {
   const colorOf = (n) => {
     const c = puzzle.colors.find((col) => col.number === n)
@@ -70,14 +70,12 @@ function Thumbnail({ puzzle }) {
   return (
     <svg
       className="thumb"
-      viewBox={`0 0 ${puzzle.width} ${puzzle.height}`}
+      viewBox={`0 0 ${puzzle.viewBox.w} ${puzzle.viewBox.h}`}
       preserveAspectRatio="xMidYMid meet"
     >
-      {puzzle.grid.map((row, y) =>
-        row.map((n, x) => (
-          <rect key={`${x}-${y}`} x={x} y={y} width={1.02} height={1.02} fill={colorOf(n)} />
-        ))
-      )}
+      {puzzle.regions.map((region, i) => (
+        <path key={i} d={region.d} fill={colorOf(region.number)} />
+      ))}
     </svg>
   )
 }

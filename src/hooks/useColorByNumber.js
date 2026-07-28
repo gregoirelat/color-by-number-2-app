@@ -1,49 +1,42 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 // ---------------------------------------------------------------------------
-// Hook qui gère tout l'état du jeu de coloriage pour un puzzle donné.
+// Hook qui gère l'état d'une partie de coloriage pour un dessin vectoriel.
 //
-// Il expose :
-//   - filled : tableau à plat (length = width*height) où chaque case vaut
-//              `true` une fois correctement coloriée, `false` sinon.
-//   - activeColor : le numéro de couleur actuellement sélectionné.
-//   - progress : pour chaque numéro de couleur, { done, total, complete }.
-//   - isComplete : true quand tout le dessin est terminé.
-//   - selectColor(number) / paintCell(index) : actions.
-//
-// La progression est sauvegardée automatiquement dans le localStorage pour
-// pouvoir reprendre plus tard.
+// Le dessin est une liste de régions ; `filled` est un tableau de booléens
+// indexé comme `puzzle.regions`. La progression est sauvegardée automatiquement
+// dans le localStorage (indépendamment par dessin).
 // ---------------------------------------------------------------------------
 
 const storageKey = (puzzleId) => `cbn:progress:${puzzleId}`
 
 export function useColorByNumber(puzzle) {
-  const total = puzzle.width * puzzle.height
+  const total = puzzle.regions.length
 
-  // Version à plat de la grille : le numéro attendu pour chaque case.
-  const flatGrid = useMemo(() => puzzle.grid.flat(), [puzzle])
+  // Numéro de couleur attendu pour chaque région.
+  const regionNumbers = useMemo(
+    () => puzzle.regions.map((r) => r.number),
+    [puzzle]
+  )
 
-  // État des cases remplies, restauré depuis le localStorage si disponible.
   const [filled, setFilled] = useState(() => loadProgress(puzzle.id, total))
-
-  // Couleur active : par défaut la première de la palette.
   const [activeColor, setActiveColor] = useState(puzzle.colors[0].number)
 
-  // Sauvegarde automatique à chaque changement.
+  // Sauvegarde automatique.
   useEffect(() => {
     try {
       localStorage.setItem(storageKey(puzzle.id), JSON.stringify(filled))
     } catch {
-      // Stockage indisponible (mode privé, quota...) : on ignore.
+      /* stockage indisponible : on ignore */
     }
   }, [filled, puzzle.id])
 
-  // Colorie une case si le numéro correspond à la couleur active.
-  // Renvoie true si la case a bien été remplie (utile pour un feedback).
-  const paintCell = useCallback(
+  // Colorie une région si son numéro correspond à la couleur active.
+  // Renvoie true si la région a bien été remplie.
+  const paintRegion = useCallback(
     (index) => {
-      if (filled[index]) return false // déjà remplie
-      if (flatGrid[index] !== activeColor) return false // mauvaise couleur
+      if (filled[index]) return false
+      if (regionNumbers[index] !== activeColor) return false
       setFilled((prev) => {
         const next = prev.slice()
         next[index] = true
@@ -51,15 +44,11 @@ export function useColorByNumber(puzzle) {
       })
       return true
     },
-    [filled, flatGrid, activeColor]
+    [filled, regionNumbers, activeColor]
   )
 
   const selectColor = useCallback((number) => setActiveColor(number), [])
-
-  // Réinitialise le puzzle.
-  const reset = useCallback(() => {
-    setFilled(new Array(total).fill(false))
-  }, [total])
+  const reset = useCallback(() => setFilled(new Array(total).fill(false)), [total])
 
   // Progression par couleur.
   const progress = useMemo(() => {
@@ -67,7 +56,7 @@ export function useColorByNumber(puzzle) {
     for (const color of puzzle.colors) {
       map[color.number] = { done: 0, total: 0, complete: false }
     }
-    flatGrid.forEach((number, index) => {
+    regionNumbers.forEach((number, index) => {
       const entry = map[number]
       if (!entry) return
       entry.total += 1
@@ -77,7 +66,7 @@ export function useColorByNumber(puzzle) {
       map[key].complete = map[key].total > 0 && map[key].done === map[key].total
     }
     return map
-  }, [puzzle.colors, flatGrid, filled])
+  }, [puzzle.colors, regionNumbers, filled])
 
   const isComplete = useMemo(
     () => filled.length === total && filled.every(Boolean),
@@ -86,24 +75,20 @@ export function useColorByNumber(puzzle) {
 
   return {
     filled,
-    flatGrid,
     activeColor,
     progress,
     isComplete,
     selectColor,
-    paintCell,
+    paintRegion,
     reset,
   }
 }
 
-// Nombre de cases déjà remplies pour un dessin (lecture seule, pour l'écran
-// de sélection).
+// Nombre de régions déjà remplies (lecture seule, pour l'écran de sélection).
 export function getSavedCount(puzzleId, total) {
   return loadProgress(puzzleId, total).filter(Boolean).length
 }
 
-// Charge la progression enregistrée, en vérifiant qu'elle correspond à la
-// taille attendue (sinon on repart de zéro).
 function loadProgress(puzzleId, total) {
   try {
     const raw = localStorage.getItem(storageKey(puzzleId))
@@ -114,7 +99,7 @@ function loadProgress(puzzleId, total) {
       }
     }
   } catch {
-    // Ignoré : on retombe sur un état vierge.
+    /* ignoré */
   }
   return new Array(total).fill(false)
 }

@@ -111,65 +111,52 @@ body {
   touch-action: none; /* on gère nous-mêmes zoom/pan */
 }
 
-.grid {
+.canvas {
   position: absolute;
   top: 0;
   left: 0;
-  display: grid;
   transform-origin: 0 0;
-  gap: 1px;
-  background: var(--border);
-  padding: 1px;
-  border-radius: 4px;
   will-change: transform;
 }
 
-.cell-slot {
-  width: 40px;
-  height: 40px;
+.art {
+  display: block;
+  /* Contours nets même très zoomés. */
+  shape-rendering: geometricPrecision;
 }
 
-/* ----- Cases ------------------------------------------------------------- */
+/* ----- Régions à colorier ------------------------------------------------ */
 
-.cell {
-  width: 100%;
-  height: 100%;
-  padding: 0;
-  border: none;
-  background: #fbfcfe;
+.region {
+  stroke: #7f8794;
+  stroke-width: 0.35;
+  stroke-linejoin: round;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 13px;
-  color: var(--muted);
-  transition: background-color 0.12s ease;
+  transition: fill 0.18s ease;
 }
 
-.cell--filled {
-  cursor: default;
-  animation: pop 0.18s ease;
-}
-
-.cell__number {
-  pointer-events: none;
+/* Région remplie : contour plus discret pour laisser respirer les couleurs. */
+.region--done {
+  stroke: rgba(0, 0, 0, 0.14);
+  stroke-width: 0.25;
 }
 
 /* Feedback quand on tape avec la mauvaise couleur. */
-.cell--wrong {
-  animation: shake 0.3s ease;
-  background: #ffe0e6;
+.region--wrong {
+  animation: wrongflash 0.32s ease;
 }
 
-@keyframes pop {
-  0% { transform: scale(0.6); }
-  100% { transform: scale(1); }
+@keyframes wrongflash {
+  0%, 100% { stroke: #7f8794; stroke-width: 0.35; }
+  50% { stroke: #ff3b6b; stroke-width: 1.1; }
 }
 
-@keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-3px); }
-  75% { transform: translateX(3px); }
+.region__num {
+  fill: #9aa1ad;
+  pointer-events: none;
+  font-family: system-ui, sans-serif;
+  font-weight: 600;
+  user-select: none;
 }
 
 /* ----- Contrôles de zoom ------------------------------------------------- */
