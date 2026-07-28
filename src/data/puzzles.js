@@ -667,11 +667,11 @@ const lake = (() => {
     difficulty: 'Photo',
     w: W,
     h: H,
-    cols: 48,
-    rows: 34,
+    cols: 56,
+    rows: 40,
     seed: 3,
     jitter: 0.9,
-    paletteSize: 30,
+    paletteSize: 120,
     field,
   })
 })()

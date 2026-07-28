@@ -55,8 +55,11 @@ facettées de plusieurs centaines de triangles ombrés. Le **Lac de montagne** v
 plus loin (`voronoiPhoto`) : au lieu d'un maillage régulier, ce sont des
 **cellules de Voronoï** aux contours **irréguliers** (ni triangles ni carrés),
 colorées par un champ continu dont la **palette est calculée automatiquement**
-(k-means). Une fois remplies et fondues, les cellules donnent une mosaïque quasi
-photographique. Voir `src/data/lowpoly.js`.
+(k-means, **120 tons** pour un rendu très fidèle). Une fois remplies et fondues,
+les cellules donnent une mosaïque quasi photographique. Voir `src/data/lowpoly.js`.
+
+Au-delà de ~16 couleurs, la palette passe en **mode compact** (grille de
+pastilles numérotées) pour rester utilisable.
 
 Les dessins « photo » comptent des milliers de facettes : le coloriage met à jour
 le nœud DOM concerné directement (sans re-rendre tout le SVG) et la surbrillance
