@@ -1,22 +1,42 @@
-import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 
 // ---------------------------------------------------------------------------
 // Canevas vectoriel : affiche un dessin comme un ensemble de régions SVG et
 // gère le zoom / déplacement / pincement.
 //
-// - Tant qu'une région n'est pas remplie : contour fin + petit numéro au centre.
-// - On tape une région : si elle correspond à la couleur active, elle se
-//   remplit ; sinon petit clignotement de contour (feedback).
-// - Molette / pincement à deux doigts : zoom. Glisser : déplacement.
-// - Le dessin est ajusté automatiquement à l'écran (fit-to-view).
+// Performance : les dessins « photo » comptent plusieurs milliers de facettes.
+// Deux principes pour rester fluide :
+//   - le SVG (mémoïsé) n'est PAS re-rendu pendant le zoom/déplacement (seul le
+//     `transform` du conteneur change) ;
+//   - colorier une facette met à jour SON nœud DOM directement, sans re-rendre
+//     les milliers d'autres. Un re-rendu complet n'a lieu que sur les
+//     changements globaux (couleur active, réinitialisation).
 // ---------------------------------------------------------------------------
 
-const BASE = 8 // pixels « contenu » par unité de viewBox (avant zoom)
+const BASE = 8
 const DRAG_THRESHOLD = 6
 
-export function RegionCanvas({ puzzle, filled, activeColor, onPaint }) {
+export function RegionCanvas({ puzzle, filled, activeColor, renderTick, onPaint }) {
   const viewportRef = useRef(null)
   const contentRef = useRef(null)
+
+  // Miroir de `filled` mis à jour pendant le rendu : le SVG mémoïsé le lit au
+  // moment où il se re-rend (couleur active / reset) pour afficher l'état exact.
+  const filledRef = useRef(filled)
+  filledRef.current = filled
+
+  const colorMap = useMemo(() => new Map(puzzle.colors.map((c) => [c.number, c.hex])), [puzzle])
+  const regionNumbers = useMemo(() => puzzle.regions.map((r) => r.number), [puzzle])
+  // Indices des régions par numéro de couleur (pour la surbrillance).
+  const indicesByColor = useMemo(() => {
+    const m = new Map()
+    puzzle.regions.forEach((r, i) => {
+      if (!m.has(r.number)) m.set(r.number, [])
+      m.get(r.number).push(i)
+    })
+    return m
+  }, [puzzle])
+  const prevActive = useRef(null)
 
   const [transform, setTransform] = useState({ scale: 1, x: 0, y: 0 })
   const transformRef = useRef(transform)
@@ -25,15 +45,11 @@ export function RegionCanvas({ puzzle, filled, activeColor, onPaint }) {
   }, [transform])
 
   const scaleBounds = useRef({ min: 0.2, max: 6 })
-
-  const [wrongId, setWrongId] = useState(null)
-  const wrongTimer = useRef(null)
-
   const pointers = useRef(new Map())
   const gesture = useRef(null)
+  const wrongTimers = useRef(new Map())
 
-  const clampScale = (s) =>
-    Math.min(scaleBounds.current.max, Math.max(scaleBounds.current.min, s))
+  const clampScale = (s) => Math.min(scaleBounds.current.max, Math.max(scaleBounds.current.min, s))
 
   const cw = puzzle.viewBox.w * BASE
   const ch = puzzle.viewBox.h * BASE
@@ -48,11 +64,7 @@ export function RegionCanvas({ puzzle, filled, activeColor, onPaint }) {
     const rawFit = Math.min(rect.width / cw, rect.height / ch)
     const fit = rawFit * 0.92
     scaleBounds.current = { min: fit * 0.9, max: Math.max(fit * 6, 2) }
-    setTransform({
-      scale: fit,
-      x: (rect.width - cw * fit) / 2,
-      y: (rect.height - ch * fit) / 2,
-    })
+    setTransform({ scale: fit, x: (rect.width - cw * fit) / 2, y: (rect.height - ch * fit) / 2 })
   }, [cw, ch])
 
   useLayoutEffect(() => {
@@ -66,20 +78,23 @@ export function RegionCanvas({ puzzle, filled, activeColor, onPaint }) {
     return () => window.removeEventListener('resize', onResize)
   }, [fitToView])
 
-  // ----- Zoom centré sur un point -----------------------------------------
+  // ----- Zoom centré ------------------------------------------------------
 
-  const zoomAround = useCallback((nextScale, px, py) => {
-    setTransform((prev) => {
-      const scale = clampScale(nextScale)
-      const ratio = scale / prev.scale
-      return constrain(
-        { scale, x: px - (px - prev.x) * ratio, y: py - (py - prev.y) * ratio },
-        viewportRef.current,
-        cw,
-        ch
-      )
-    })
-  }, [cw, ch])
+  const zoomAround = useCallback(
+    (nextScale, px, py) => {
+      setTransform((prev) => {
+        const scale = clampScale(nextScale)
+        const ratio = scale / prev.scale
+        return constrain(
+          { scale, x: px - (px - prev.x) * ratio, y: py - (py - prev.y) * ratio },
+          viewportRef.current,
+          cw,
+          ch
+        )
+      })
+    },
+    [cw, ch]
+  )
 
   const handleWheel = useCallback(
     (e) => {
@@ -91,23 +106,86 @@ export function RegionCanvas({ puzzle, filled, activeColor, onPaint }) {
     [zoomAround]
   )
 
-  // ----- Feedback « mauvaise couleur » ------------------------------------
+  // ----- Coloriage (mise à jour DOM directe) ------------------------------
 
-  const flashWrong = useCallback((id) => {
-    setWrongId(id)
-    if (wrongTimer.current) clearTimeout(wrongTimer.current)
-    wrongTimer.current = setTimeout(() => setWrongId(null), 320)
+  const svgEl = () => contentRef.current && contentRef.current.querySelector('svg.art')
+
+  // Applique visuellement le coloriage d'une facette sans re-rendre le SVG.
+  const applyFilled = useCallback(
+    (index) => {
+      const svg = svgEl()
+      if (!svg) return
+      const path = svg.querySelector(`path[data-region="${index}"]`)
+      if (path) {
+        const base = colorMap.get(regionNumbers[index]) || '#fff'
+        path.setAttribute('fill', base)
+        path.classList.add('region--done')
+        path.classList.remove('region--target')
+        if (puzzle.smooth) {
+          path.setAttribute('stroke', base)
+          path.classList.add('region--blend')
+        }
+      }
+      // On masque le numéro par l'opacité (changement « peinture », pas de
+      // recalcul de mise en page — contrairement à display:none).
+      const txt = svg.querySelector(`text[data-num="${index}"]`)
+      if (txt) {
+        txt.style.opacity = '0'
+        txt.classList.remove('region__num--target')
+      }
+    },
+    [colorMap, regionNumbers, puzzle.smooth]
+  )
+
+  // Surbrillance de la couleur active, appliquée en DOM direct (jamais via un
+  // re-rendu React) : uniquement des changements de peinture -> aucun recalcul
+  // de mise en page, donc les taps restent instantanés même à plusieurs
+  // milliers de facettes.
+  useEffect(() => {
+    const svg = svgEl()
+    if (!svg) return
+    const setTarget = (i, on) => {
+      if (filledRef.current[i]) return
+      const path = svg.querySelector(`path[data-region="${i}"]`)
+      if (path) {
+        path.setAttribute('fill', on ? tint(colorMap.get(regionNumbers[i]) || '#fff', 0.3) : '#fcfcfd')
+        path.classList.toggle('region--target', on)
+      }
+      const txt = svg.querySelector(`text[data-num="${i}"]`)
+      if (txt) txt.classList.toggle('region__num--target', on)
+    }
+    if (prevActive.current != null && prevActive.current !== activeColor) {
+      for (const i of indicesByColor.get(prevActive.current) || []) setTarget(i, false)
+    }
+    for (const i of indicesByColor.get(activeColor) || []) setTarget(i, true)
+    prevActive.current = activeColor
+    // renderTick : après un « Recommencer », le SVG est re-rendu neutre -> on
+    // réapplique la surbrillance.
+  }, [activeColor, renderTick, indicesByColor, colorMap, regionNumbers])
+
+  const flashWrong = useCallback((index) => {
+    const svg = svgEl()
+    const path = svg && svg.querySelector(`path[data-region="${index}"]`)
+    if (!path) return
+    path.classList.add('region--wrong')
+    if (wrongTimers.current.has(index)) clearTimeout(wrongTimers.current.get(index))
+    wrongTimers.current.set(
+      index,
+      setTimeout(() => path.classList.remove('region--wrong'), 320)
+    )
   }, [])
 
   const handlePaint = useCallback(
     (index) => {
+      if (filledRef.current[index]) return
       const ok = onPaint(index)
-      if (!ok && !filled[index]) flashWrong(index)
+      if (ok) applyFilled(index)
+      else flashWrong(index)
     },
-    [onPaint, filled, flashWrong]
+    [onPaint, applyFilled, flashWrong]
   )
 
-  // ----- Gestes ------------------------------------------------------------
+  // ----- Gestes -----------------------------------------------------------
 
   const toLocal = (clientX, clientY) => {
     const rect = viewportRef.current.getBoundingClientRect()
@@ -134,109 +212,88 @@ export function RegionCanvas({ puzzle, filled, activeColor, onPaint }) {
     }
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
     if (pointers.current.size === 1) {
-      gesture.current = {
-        mode: 'pending',
-        startX: e.clientX,
-        startY: e.clientY,
-        startTf: { ...transformRef.current },
-      }
+      gesture.current = { mode: 'pending', startX: e.clientX, startY: e.clientY, startTf: { ...transformRef.current } }
     } else if (pointers.current.size === 2) {
       startPinch()
     }
   }, [])
 
-  const onPointerMove = useCallback((e) => {
-    if (!pointers.current.has(e.pointerId)) return
-    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
-    const g = gesture.current
-    if (!g) return
+  const onPointerMove = useCallback(
+    (e) => {
+      if (!pointers.current.has(e.pointerId)) return
+      pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+      const g = gesture.current
+      if (!g) return
 
-    if (g.mode === 'pinch' && pointers.current.size >= 2) {
-      const [a, b] = [...pointers.current.values()]
-      const dist = distance(a, b)
-      const mc = midpoint(a, b)
-      const mid = toLocal(mc.x, mc.y)
-      const scale = clampScale(g.startScale * (dist / g.startDist))
-      const kx = (g.startMid.x - g.startTf.x) / g.startScale
-      const ky = (g.startMid.y - g.startTf.y) / g.startScale
-      setTransform(
-        constrain(
-          { scale, x: mid.x - kx * scale, y: mid.y - ky * scale },
-          viewportRef.current,
-          cw,
-          ch
-        )
-      )
-      return
-    }
-
-    if (g.mode === 'pending') {
-      const moved = Math.hypot(e.clientX - g.startX, e.clientY - g.startY)
-      if (moved > DRAG_THRESHOLD) g.mode = 'drag'
-    }
-
-    if (g.mode === 'drag') {
-      const dx = e.clientX - g.startX
-      const dy = e.clientY - g.startY
-      setTransform(
-        constrain(
-          { scale: g.startTf.scale, x: g.startTf.x + dx, y: g.startTf.y + dy },
-          viewportRef.current,
-          cw,
-          ch
-        )
-      )
-    }
-  }, [cw, ch])
-
-  const onPointerUp = useCallback((e) => {
-    const g = gesture.current
-    pointers.current.delete(e.pointerId)
-
-    if (g && g.mode === 'pending' && !g.noTap) {
-      const el = document.elementFromPoint(e.clientX, e.clientY)
-      const target = el && el.closest('[data-region]')
-      if (target) handlePaint(Number(target.getAttribute('data-region')))
-    }
-
-    if (pointers.current.size === 0) {
-      gesture.current = null
-    } else if (pointers.current.size === 1) {
-      const [only] = [...pointers.current.values()]
-      gesture.current = {
-        mode: 'pending',
-        noTap: true,
-        startX: only.x,
-        startY: only.y,
-        startTf: { ...transformRef.current },
+      if (g.mode === 'pinch' && pointers.current.size >= 2) {
+        const [a, b] = [...pointers.current.values()]
+        const dist = distance(a, b)
+        const mc = midpoint(a, b)
+        const mid = toLocal(mc.x, mc.y)
+        const scale = clampScale(g.startScale * (dist / g.startDist))
+        const kx = (g.startMid.x - g.startTf.x) / g.startScale
+        const ky = (g.startMid.y - g.startTf.y) / g.startScale
+        setTransform(constrain({ scale, x: mid.x - kx * scale, y: mid.y - ky * scale }, viewportRef.current, cw, ch))
+        return
       }
-    }
-  }, [handlePaint])
+
+      if (g.mode === 'pending') {
+        const moved = Math.hypot(e.clientX - g.startX, e.clientY - g.startY)
+        if (moved > DRAG_THRESHOLD) g.mode = 'drag'
+      }
+
+      if (g.mode === 'drag') {
+        const dx = e.clientX - g.startX
+        const dy = e.clientY - g.startY
+        setTransform(
+          constrain({ scale: g.startTf.scale, x: g.startTf.x + dx, y: g.startTf.y + dy }, viewportRef.current, cw, ch)
+        )
+      }
+    },
+    [cw, ch]
+  )
+
+  const onPointerUp = useCallback(
+    (e) => {
+      const g = gesture.current
+      pointers.current.delete(e.pointerId)
+      if (g && g.mode === 'pending' && !g.noTap) {
+        const el = document.elementFromPoint(e.clientX, e.clientY)
+        const target = el && el.closest('[data-region]')
+        if (target) handlePaint(Number(target.getAttribute('data-region')))
+      }
+      if (pointers.current.size === 0) {
+        gesture.current = null
+      } else if (pointers.current.size === 1) {
+        const [only] = [...pointers.current.values()]
+        gesture.current = { mode: 'pending', noTap: true, startX: only.x, startY: only.y, startTf: { ...transformRef.current } }
+      }
+    },
+    [handlePaint]
+  )
 
   const zoomButton = (factor) => () => {
     const rect = viewportRef.current.getBoundingClientRect()
     zoomAround(transformRef.current.scale * factor, rect.width / 2, rect.height / 2)
   }
 
-  // Remplit toutes les zones de la couleur active actuellement visibles à
-  // l'écran. onPaint ignore les zones déjà remplies ou d'une autre couleur.
+  // Remplit les zones de la couleur active actuellement visibles à l'écran.
   const fillVisible = useCallback(() => {
     const vp = viewportRef.current
     if (!vp) return
     const rect = vp.getBoundingClientRect()
     const t = transformRef.current
-    const sx = cw / puzzle.viewBox.w // px « contenu » par unité de viewBox
+    const sx = cw / puzzle.viewBox.w
     const sy = ch / puzzle.viewBox.h
     puzzle.regions.forEach((region, index) => {
-      if (filled[index]) return
-      if (region.number !== activeColor) return
+      if (filledRef.current[index] || region.number !== activeColor) return
       const px = t.x + t.scale * region.label.x * sx
       const py = t.y + t.scale * region.label.y * sy
-      if (px >= 0 && px <= rect.width && py >= 0 && py <= rect.height) onPaint(index)
+      if (px >= 0 && px <= rect.width && py >= 0 && py <= rect.height) {
+        if (onPaint(index)) applyFilled(index)
+      }
     })
-  }, [puzzle, filled, activeColor, onPaint, cw, ch])
-
-  // ----- Rendu -------------------------------------------------------------
+  }, [puzzle, activeColor, onPaint, applyFilled, cw, ch])
 
   return (
     <div className="grid-area">
@@ -260,9 +317,9 @@ export function RegionCanvas({ puzzle, filled, activeColor, onPaint }) {
         >
           <Artwork
             puzzle={puzzle}
-            filled={filled}
-            wrongId={wrongId}
-            activeColor={activeColor}
+            filledRef={filledRef}
+            renderTick={renderTick}
+            colorMap={colorMap}
             cw={cw}
             ch={ch}
           />
@@ -283,70 +340,70 @@ export function RegionCanvas({ puzzle, filled, activeColor, onPaint }) {
 }
 
 // ---------------------------------------------------------------------------
-// Rendu SVG du dessin, isolé dans un composant mémoïsé : il ne se re-rend que
-// lorsqu'une région change (coloriage / feedback), PAS pendant le zoom ou le
-// déplacement. Indispensable pour rester fluide sur les dessins « low-poly »
-// de plusieurs centaines de facettes.
+// Rendu SVG complet. Mémoïsé : ne se re-rend que sur un changement global
+// (couleur active, réinitialisation, taille), jamais pendant le zoom, le
+// déplacement ou le coloriage d'une facette (géré en DOM direct).
 // ---------------------------------------------------------------------------
 
-const Artwork = memo(function Artwork({ puzzle, filled, wrongId, activeColor, cw, ch }) {
-  const colorOf = (n) => {
-    const c = puzzle.colors.find((col) => col.number === n)
-    return c ? c.hex : '#fff'
-  }
-  // Taille du numéro relative au dessin.
-  const fontSize = Math.max(1.8, Math.min(puzzle.viewBox.w, puzzle.viewBox.h) / 26)
+const Artwork = memo(function Artwork({ puzzle, filledRef, colorMap, cw, ch }) {
+  const filled = filledRef.current
+  const colorOf = (n) => colorMap.get(n) || '#fff'
+  // Taille du numéro : adaptée à la facette pour les dessins low-poly, sinon
+  // relative à la taille du dessin.
+  const fontSize = puzzle.numberSize || Math.max(1.8, Math.min(puzzle.viewBox.w, puzzle.viewBox.h) / 26)
+  const smooth = !!puzzle.smooth
 
+  // Le rendu React est « neutre » : état rempli / non rempli seulement. La
+  // surbrillance de la couleur active est appliquée ensuite en DOM direct
+  // (voir RegionCanvas) pour ne jamais invalider la mise en page du SVG.
   return (
-    <svg
-      viewBox={`0 0 ${puzzle.viewBox.w} ${puzzle.viewBox.h}`}
-      width={cw}
-      height={ch}
-      className="art"
-    >
+    <svg viewBox={`0 0 ${puzzle.viewBox.w} ${puzzle.viewBox.h}`} width={cw} height={ch} className="art">
       {puzzle.regions.map((region, index) => {
-        const done = filled[index]
-        // Aide : les zones de la couleur active (non remplies) sont teintées
-        // légèrement pour les repérer d'un coup d'œil.
-        const isTarget = !done && region.number === activeColor
-        const fill = done
-          ? colorOf(region.number)
-          : isTarget
-            ? tint(colorOf(region.number), 0.3)
-            : '#fcfcfd'
+        const done = !!filled[index]
         return (
-          <path
+          <RegionItem
             key={index}
-            data-region={index}
+            index={index}
             d={region.d}
-            fill={fill}
-            className={
-              'region' +
-              (done ? ' region--done' : '') +
-              (isTarget ? ' region--target' : '') +
-              (wrongId === index ? ' region--wrong' : '')
-            }
+            base={colorOf(region.number)}
+            done={done}
+            smooth={smooth}
+            lx={region.label.x}
+            ly={region.label.y}
+            num={region.number}
+            fontSize={fontSize}
           />
         )
       })}
-      {puzzle.regions.map((region, index) =>
-        filled[index] ? null : (
-          <text
-            key={`t${index}`}
-            x={region.label.x}
-            y={region.label.y}
-            className={
-              'region__num' + (region.number === activeColor ? ' region__num--target' : '')
-            }
-            fontSize={fontSize}
-            dominantBaseline="central"
-            textAnchor="middle"
-          >
-            {region.number}
-          </text>
-        )
-      )}
     </svg>
+  )
+})
+
+const RegionItem = memo(function RegionItem({ index, d, base, done, smooth, lx, ly, num, fontSize }) {
+  const stroke = done && smooth ? base : undefined
+  return (
+    <>
+      <path
+        data-region={index}
+        d={d}
+        fill={done ? base : '#fcfcfd'}
+        stroke={stroke}
+        className={'region' + (done ? ' region--done' : '') + (stroke ? ' region--blend' : '')}
+      />
+      {!done && (
+        <text
+          data-num={index}
+          x={lx}
+          y={ly}
+          className="region__num"
+          fontSize={fontSize}
+          dominantBaseline="central"
+          textAnchor="middle"
+        >
+          {num}
+        </text>
+      )}
+    </>
   )
 })
 
@@ -370,8 +427,6 @@ function constrain(t, viewport, cw, ch) {
   const rect = viewport.getBoundingClientRect()
   const w = cw * t.scale
   const h = ch * t.scale
-  const rangeX = rect.width - w
-  const rangeY = rect.height - h
   const clamp = (v, a, b) => Math.min(Math.max(v, Math.min(a, b)), Math.max(a, b))
-  return { scale: t.scale, x: clamp(t.x, 0, rangeX), y: clamp(t.y, 0, rangeY) }
+  return { scale: t.scale, x: clamp(t.x, 0, rect.width - w), y: clamp(t.y, 0, rect.height - h) }
 }

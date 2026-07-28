@@ -21,6 +21,10 @@ export function useColorByNumber(puzzle) {
 
   const [filled, setFilled] = useState(() => loadProgress(puzzle.id, total))
   const [activeColor, setActiveColor] = useState(puzzle.colors[0].number)
+  // Incrémenté à chaque réinitialisation / remplissage massif : sert de signal
+  // pour forcer un re-rendu complet du dessin (le coloriage normal, lui, met à
+  // jour le DOM sans re-rendu, pour rester rapide sur les gros dessins).
+  const [renderTick, setRenderTick] = useState(0)
 
   // Sauvegarde automatique.
   useEffect(() => {
@@ -48,7 +52,10 @@ export function useColorByNumber(puzzle) {
   )
 
   const selectColor = useCallback((number) => setActiveColor(number), [])
-  const reset = useCallback(() => setFilled(new Array(total).fill(false)), [total])
+  const reset = useCallback(() => {
+    setFilled(new Array(total).fill(false))
+    setRenderTick((t) => t + 1)
+  }, [total])
 
   // Progression par couleur.
   const progress = useMemo(() => {
@@ -78,6 +85,7 @@ export function useColorByNumber(puzzle) {
     activeColor,
     progress,
     isComplete,
+    renderTick,
     selectColor,
     paintRegion,
     reset,

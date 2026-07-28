@@ -15,6 +15,7 @@ export function Game({ puzzle, onBack }) {
     activeColor,
     progress,
     isComplete,
+    renderTick,
     selectColor,
     paintRegion,
     reset,
@@ -57,7 +58,13 @@ export function Game({ puzzle, onBack }) {
         </div>
       </header>
 
-      <RegionCanvas puzzle={puzzle} filled={filled} activeColor={activeColor} onPaint={paintRegion} />
+      <RegionCanvas
+        puzzle={puzzle}
+        filled={filled}
+        activeColor={activeColor}
+        renderTick={renderTick}
+        onPaint={paintRegion}
+      />
 
       <Palette
         colors={puzzle.colors}

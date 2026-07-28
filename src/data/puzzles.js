@@ -1,5 +1,22 @@
 import { band, disc, ellipse, polygon, smoothClosed } from './svg.js'
-import { lowPoly } from './lowpoly.js'
+import { lowPoly, lowPolyPhoto } from './lowpoly.js'
+
+// Petits utilitaires de couleur pour les scènes « photo ».
+const clampN = (v, a, b) => Math.min(b, Math.max(a, v))
+const mixC = (c1, c2, t) => [
+  c1[0] + (c2[0] - c1[0]) * t,
+  c1[1] + (c2[1] - c1[1]) * t,
+  c1[2] + (c2[2] - c1[2]) * t,
+]
+const gradC = (stops, t) => {
+  t = clampN(t, 0, 1)
+  for (let i = 0; i < stops.length - 1; i++) {
+    const [p0, c0] = stops[i]
+    const [p1, c1] = stops[i + 1]
+    if (t <= p1) return mixC(c0, c1, clampN((t - p0) / (p1 - p0 || 1), 0, 1))
+  }
+  return stops[stops.length - 1][1]
+}
 
 // ---------------------------------------------------------------------------
 // Catalogue des dessins.
@@ -574,6 +591,92 @@ const ocean = (() => {
 })()
 
 // ===========================================================================
+// 11. Lac de montagne (Photo) — scène low-poly fine, quasi photographique.
+// ===========================================================================
+
+const lake = (() => {
+  const W = 140
+  const H = 100
+  const horizon = 52
+  const sun = { x: 0.62 * W, y: 39, r: 6.5 }
+
+  // Crêtes des montagnes, de l'arrière (loin) vers l'avant (près de l'eau).
+  const ridges = [
+    { f: (u) => 46 - 4 * Math.sin(u * 3.3 + 0.6) - 2 * Math.sin(u * 7 + 1.0), base: [82, 84, 108], haze: 0.6, snow: [214, 214, 228] },
+    { f: (u) => 49 - 6 * Math.sin(u * 2.6 + 2.0) - 3 * Math.sin(u * 6 + 0.3), base: [58, 56, 86], haze: 0.38, snow: [198, 190, 208] },
+    { f: (u) => 52 - 9 * Math.sin(u * 2.0 + 0.2) - 4 * Math.sin(u * 5 + 1.5), base: [40, 36, 62], haze: 0.16, snow: [176, 158, 182] },
+  ]
+
+  const skyStops = [
+    [0.0, [38, 30, 70]],
+    [0.42, [96, 58, 112]],
+    [0.7, [198, 96, 106]],
+    [0.88, [242, 150, 108]],
+    [1.0, [252, 198, 150]],
+  ]
+
+  const skyColor = (x, y) => {
+    let c = gradC(skyStops, y / horizon)
+    const dg = Math.hypot(x - sun.x, (y - sun.y) * 1.15)
+    const glow = Math.exp(-(dg * dg) / (2 * 20 * 20))
+    c = mixC(c, [255, 238, 184], glow * 0.92)
+    if (Math.hypot(x - sun.x, y - sun.y) < sun.r) c = [255, 246, 208]
+    return c
+  }
+
+  const mountainColor = (x, y, r) => {
+    const u = x / W
+    let c = mixC(r.base, [214, 150, 138], r.haze) // brume atmosphérique chaude
+    // Lumière directionnelle : la pente tournée vers le soleil s'éclaire.
+    const slope = r.f(u + 0.012) - r.f(u - 0.012)
+    const litLeft = sun.x < W * 0.5
+    const lit = litLeft ? slope > 0 : slope < 0
+    c = mixC(c, lit ? [255, 216, 170] : [16, 14, 34], lit ? 0.28 : 0.34)
+    // Neige au sommet.
+    const below = y - r.f(u)
+    if (below < 3.2) c = mixC(c, r.snow, clampN((3.2 - below) / 3.2, 0, 1) * 0.7)
+    return c
+  }
+
+  // Couleur au-dessus de l'horizon (montagnes puis ciel).
+  const aboveColor = (x, y) => {
+    const u = x / W
+    for (let i = ridges.length - 1; i >= 0; i--) {
+      if (y >= ridges[i].f(u)) return mountainColor(x, y, ridges[i])
+    }
+    return skyColor(x, y)
+  }
+
+  const field = (x, y) => {
+    if (y <= horizon) return aboveColor(x, y)
+    // Lac : reflet compressé de ce qui est au-dessus, assombri + ondulations.
+    const yr = horizon - (y - horizon) * 0.9
+    let c = aboveColor(x, clampN(yr, 0, horizon))
+    c = mixC(c, [22, 30, 58], 0.4)
+    const rip = 0.5 + 0.5 * Math.sin((y - horizon) * 1.4 + Math.sin(x * 0.32) * 1.6)
+    c = mixC(c, [14, 20, 44], rip * 0.14)
+    // Colonne de reflet du soleil.
+    const gl = Math.exp(-((x - sun.x) ** 2) / (2 * 9 * 9)) * clampN(1 - (y - horizon) / (H - horizon), 0, 1)
+    c = mixC(c, [255, 232, 182], gl * 0.55)
+    return c
+  }
+
+  return lowPolyPhoto({
+    id: 'lake',
+    name: 'Lac de montagne',
+    difficulty: 'Photo',
+    w: W,
+    h: H,
+    cols: 40,
+    rows: 28,
+    seed: 3,
+    jitter: 0.5,
+    paletteSize: 30,
+    field,
+  })
+})()
+
+// ===========================================================================
 
 export const puzzles = [
   sunset,
@@ -586,6 +689,7 @@ export const puzzles = [
   rosace,
   mountains,
   forest,
+  lake,
 ]
 
-export const difficultyOrder = ['Facile', 'Moyen', 'Difficile', 'Expert']
+export const difficultyOrder = ['Facile', 'Moyen', 'Difficile', 'Expert', 'Photo']

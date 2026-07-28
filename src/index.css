@@ -141,6 +141,13 @@ body {
   stroke-width: 0.25;
 }
 
+/* Dessins « photo » : la facette remplie se fond dans ses voisines
+   (contour = sa propre couleur, appliqué en ligne). */
+.region--blend {
+  stroke-width: 0.5;
+  transition: none;
+}
+
 /* Feedback quand on tape avec la mauvaise couleur. */
 .region--wrong {
   animation: wrongflash 0.32s ease;
@@ -165,10 +172,11 @@ body {
   user-select: none;
 }
 
-/* Numéro de la couleur active : plus foncé pour se repérer. */
+/* Numéro de la couleur active : plus foncé pour se repérer.
+   (On ne change que la couleur — pas le poids — pour éviter tout recalcul de
+   mise en page du texte.) */
 .region__num--target {
-  fill: #2b3240;
-  font-weight: 700;
+  fill: #1c2230;
 }
 
 /* ----- Bouton d'aide « Remplir la vue » ---------------------------------- */
@@ -389,6 +397,7 @@ body {
 .select__level--moyen { background: #ff9f1c; }
 .select__level--difficile { background: #ff5d5d; }
 .select__level--expert { background: #9b5de5; }
+.select__level--photo { background: #1f9e8a; }
 
 .select__grid {
   display: grid;

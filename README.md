@@ -48,9 +48,18 @@ npm run preview  # prévisualiser le build
 | Rosace            | Expert     | 62    |
 | Montagnes         | Expert     | 660   |
 | Forêt             | Expert     | 660   |
+| Lac de montagne   | Photo      | 2240  |
 
 **Océan**, **Montagnes** et **Forêt** sont générées en « low-poly » : des images
-facettées de plusieurs centaines de triangles ombrés (voir `src/data/lowpoly.js`).
+facettées de plusieurs centaines de triangles ombrés. Le **Lac de montagne** va
+plus loin (`lowPolyPhoto`) : un maillage fin dont la **palette est calculée
+automatiquement** (k-means) à partir d'un champ de couleur continu, pour un rendu
+quasi photographique. Voir `src/data/lowpoly.js`.
+
+Les dessins « photo » comptent des milliers de facettes : le coloriage met à jour
+le nœud DOM concerné directement (sans re-rendre tout le SVG) et la surbrillance
+de la couleur active est aussi appliquée en DOM, ce qui garde chaque tap
+quasi instantané.
 
 ## Structure
 
