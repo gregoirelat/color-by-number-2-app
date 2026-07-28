@@ -27,6 +27,10 @@ npm run preview  # prévisualiser le build
   mauvais numéro → petit feedback (clignotement du contour).
 - **Zoom & déplacement** : molette, **pincement tactile à deux doigts**, glisser.
   Le dessin est **ajusté automatiquement** à l'écran (fit-to-view).
+- **Aides au coloriage** (utiles sur les grands dessins) :
+  - les zones de la couleur active sont **teintées** pour se repérer ;
+  - **passage automatique** à la couleur suivante quand une couleur est terminée ;
+  - bouton **« Remplir la vue »** : colorie les zones visibles de la couleur active.
 - **Sauvegarde automatique** de la progression, indépendante par dessin (localStorage).
 - **Animation de célébration** à 100 %.
 
@@ -40,11 +44,13 @@ npm run preview  # prévisualiser le build
 | Poisson           | Moyen      | 13    |
 | Papillon          | Difficile  | 19    |
 | Renard            | Difficile  | 15    |
+| Océan             | Difficile  | 520   |
 | Rosace            | Expert     | 62    |
 | Montagnes         | Expert     | 660   |
+| Forêt             | Expert     | 660   |
 
-Les **Montagnes** sont générées en « low-poly » : une image facettée de plusieurs
-centaines de triangles ombrés (voir `src/data/lowpoly.js`).
+**Océan**, **Montagnes** et **Forêt** sont générées en « low-poly » : des images
+facettées de plusieurs centaines de triangles ombrés (voir `src/data/lowpoly.js`).
 
 ## Structure
 

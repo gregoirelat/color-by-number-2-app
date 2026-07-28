@@ -29,6 +29,16 @@ export function Game({ puzzle, onBack }) {
     }
   }, [isComplete])
 
+  // Passe automatiquement à la couleur suivante quand la couleur active est
+  // terminée : plus besoin de la resélectionner à la main.
+  useEffect(() => {
+    if (isComplete) return
+    if (progress[activeColor]?.complete) {
+      const next = puzzle.colors.find((c) => !progress[c.number].complete)
+      if (next) selectColor(next.number)
+    }
+  }, [progress, activeColor, isComplete, puzzle.colors, selectColor])
+
   const totalDone = filled.filter(Boolean).length
   const totalPct = Math.round((totalDone / filled.length) * 100)
 
@@ -47,7 +57,7 @@ export function Game({ puzzle, onBack }) {
         </div>
       </header>
 
-      <RegionCanvas puzzle={puzzle} filled={filled} onPaint={paintRegion} />
+      <RegionCanvas puzzle={puzzle} filled={filled} activeColor={activeColor} onPaint={paintRegion} />
 
       <Palette
         colors={puzzle.colors}

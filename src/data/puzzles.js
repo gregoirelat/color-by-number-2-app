@@ -481,7 +481,111 @@ const mountains = (() => {
 })()
 
 // ===========================================================================
+// 9. Forêt (Expert) — sapins low-poly en rangées qui s'éloignent.
+// ===========================================================================
 
-export const puzzles = [sunset, sunflower, balloon, fish, butterfly, fox, rosace, mountains]
+const forest = (() => {
+  const w = 120
+  const h = 84
+  const colors = [
+    { number: 1, hex: '#bfe3f5', name: 'Ciel' },
+    { number: 2, hex: '#e3f3fb', name: 'Ciel bas' },
+    { number: 3, hex: '#ffe9a8', name: 'Soleil' },
+    { number: 4, hex: '#a7cf9a', name: 'Sapin loin clair' },
+    { number: 5, hex: '#89bd86', name: 'Sapin loin' },
+    { number: 6, hex: '#5f9e63', name: 'Sapin clair' },
+    { number: 7, hex: '#417c49', name: 'Sapin' },
+    { number: 8, hex: '#2c6138', name: 'Sapin proche clair' },
+    { number: 9, hex: '#1c4a2a', name: 'Sapin proche' },
+    { number: 10, hex: '#6b8a3f', name: 'Prairie' },
+  ]
+
+  // Un sapin = triangle pointe en haut. Renvoie 'L'/'R' (côté) ou null.
+  const pine = (x, y, baseY, height, spacing, offset) => {
+    const idx = Math.round((x - offset) / spacing)
+    const xc = offset + idx * spacing
+    const apexY = baseY - height
+    if (y < apexY || y > baseY) return null
+    const halfW = spacing * 0.6
+    const wAtY = (halfW * (y - apexY)) / (baseY - apexY)
+    if (Math.abs(x - xc) <= wAtY) return x < xc ? 'L' : 'R'
+    return null
+  }
+
+  const sun = { x: 0.22 * w, y: 22, r: 8 }
+  const field = (x, y) => {
+    // Rangées de sapins, de la plus proche (devant) à la plus lointaine.
+    const rows = [
+      { baseY: 82, height: 40, sp: 16, off: 4, L: 8, R: 9 },
+      { baseY: 68, height: 30, sp: 12, off: 9, L: 6, R: 7 },
+      { baseY: 56, height: 22, sp: 10, off: 3, L: 4, R: 5 },
+    ]
+    for (const r of rows) {
+      const s = pine(x, y, r.baseY, r.height, r.sp, r.off)
+      if (s) return s === 'L' ? r.L : r.R
+    }
+    if (y > 72) return 10 // prairie
+    // Ciel
+    if (Math.hypot(x - sun.x, y - sun.y) < sun.r) return 3
+    return y < 26 ? 1 : 2
+  }
+
+  return lowPoly({ id: 'forest', name: 'Forêt', difficulty: 'Expert', w, h, cols: 22, rows: 15, seed: 5, jitter: 0.55, colors, field })
+})()
+
+// ===========================================================================
+// 10. Océan (Difficile) — houle low-poly en bandes dégradées, soleil.
+// ===========================================================================
+
+const ocean = (() => {
+  const w = 120
+  const h = 80
+  const colors = [
+    { number: 1, hex: '#ffe3b0', name: 'Ciel chaud' },
+    { number: 2, hex: '#ffd0e0', name: 'Ciel rose' },
+    { number: 3, hex: '#cfe4ff', name: 'Ciel' },
+    { number: 4, hex: '#fff2c2', name: 'Soleil' },
+    { number: 5, hex: '#8fe0e6', name: 'Écume' },
+    { number: 6, hex: '#5fc6da', name: 'Mer claire' },
+    { number: 7, hex: '#37a1c6', name: 'Mer' },
+    { number: 8, hex: '#2079ac', name: 'Mer profonde' },
+    { number: 9, hex: '#155688', name: 'Abysse' },
+  ]
+
+  const horizon = 30
+  const sun = { x: 0.5 * w, y: 18, r: 9 }
+  const field = (x, y) => {
+    if (y < horizon) {
+      if (Math.hypot(x - sun.x, y - sun.y) < sun.r) return 4
+      if (y < 10) return 3
+      if (y < 20) return 2
+      return 1
+    }
+    // Mer : bandes ondulées, du clair (surface) au foncé (profondeur).
+    const disp = 2.6 * Math.sin(x / 9 + y / 5) + 1.4 * Math.sin(x / 4 - y / 7)
+    const depth = y - horizon + disp
+    const bandH = (h - horizon) / 5
+    const seaColors = [5, 6, 7, 8, 9]
+    const bi = Math.max(0, Math.min(4, Math.floor(depth / bandH)))
+    return seaColors[bi]
+  }
+
+  return lowPoly({ id: 'ocean', name: 'Océan', difficulty: 'Difficile', w, h, cols: 20, rows: 13, seed: 8, jitter: 0.6, colors, field })
+})()
+
+// ===========================================================================
+
+export const puzzles = [
+  sunset,
+  sunflower,
+  balloon,
+  fish,
+  butterfly,
+  fox,
+  ocean,
+  rosace,
+  mountains,
+  forest,
+]
 
 export const difficultyOrder = ['Facile', 'Moyen', 'Difficile', 'Expert']

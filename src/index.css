@@ -151,12 +151,47 @@ body {
   50% { stroke: #ff3b6b; stroke-width: 1.1; }
 }
 
+/* Zone de la couleur active : contour un peu plus marqué. */
+.region--target {
+  stroke: #5b6472;
+  stroke-width: 0.4;
+}
+
 .region__num {
   fill: #9aa1ad;
   pointer-events: none;
   font-family: system-ui, sans-serif;
   font-weight: 600;
   user-select: none;
+}
+
+/* Numéro de la couleur active : plus foncé pour se repérer. */
+.region__num--target {
+  fill: #2b3240;
+  font-weight: 700;
+}
+
+/* ----- Bouton d'aide « Remplir la vue » ---------------------------------- */
+
+.assist-btn {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+.assist-btn:hover {
+  background: #eef1f7;
+}
+.assist-btn:active {
+  transform: translateY(1px);
 }
 
 /* ----- Contrôles de zoom ------------------------------------------------- */

@@ -14,7 +14,7 @@ import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 
 const BASE = 8 // pixels « contenu » par unité de viewBox (avant zoom)
 const DRAG_THRESHOLD = 6
 
-export function RegionCanvas({ puzzle, filled, onPaint }) {
+export function RegionCanvas({ puzzle, filled, activeColor, onPaint }) {
   const viewportRef = useRef(null)
   const contentRef = useRef(null)
 
@@ -218,6 +218,24 @@ export function RegionCanvas({ puzzle, filled, onPaint }) {
     zoomAround(transformRef.current.scale * factor, rect.width / 2, rect.height / 2)
   }
 
+  // Remplit toutes les zones de la couleur active actuellement visibles à
+  // l'écran. onPaint ignore les zones déjà remplies ou d'une autre couleur.
+  const fillVisible = useCallback(() => {
+    const vp = viewportRef.current
+    if (!vp) return
+    const rect = vp.getBoundingClientRect()
+    const t = transformRef.current
+    const sx = cw / puzzle.viewBox.w // px « contenu » par unité de viewBox
+    const sy = ch / puzzle.viewBox.h
+    puzzle.regions.forEach((region, index) => {
+      if (filled[index]) return
+      if (region.number !== activeColor) return
+      const px = t.x + t.scale * region.label.x * sx
+      const py = t.y + t.scale * region.label.y * sy
+      if (px >= 0 && px <= rect.width && py >= 0 && py <= rect.height) onPaint(index)
+    })
+  }, [puzzle, filled, activeColor, onPaint, cw, ch])
+
   // ----- Rendu -------------------------------------------------------------
 
   return (
@@ -240,9 +258,20 @@ export function RegionCanvas({ puzzle, filled, onPaint }) {
             transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})`,
           }}
         >
-          <Artwork puzzle={puzzle} filled={filled} wrongId={wrongId} cw={cw} ch={ch} />
+          <Artwork
+            puzzle={puzzle}
+            filled={filled}
+            wrongId={wrongId}
+            activeColor={activeColor}
+            cw={cw}
+            ch={ch}
+          />
         </div>
       </div>
+
+      <button type="button" className="assist-btn" onClick={fillVisible}>
+        🪣 Remplir la vue
+      </button>
 
       <div className="zoom-controls">
         <button type="button" onClick={zoomButton(1 / 1.3)} aria-label="Dézoomer">−</button>
@@ -260,7 +289,7 @@ export function RegionCanvas({ puzzle, filled, onPaint }) {
 // de plusieurs centaines de facettes.
 // ---------------------------------------------------------------------------
 
-const Artwork = memo(function Artwork({ puzzle, filled, wrongId, cw, ch }) {
+const Artwork = memo(function Artwork({ puzzle, filled, wrongId, activeColor, cw, ch }) {
   const colorOf = (n) => {
     const c = puzzle.colors.find((col) => col.number === n)
     return c ? c.hex : '#fff'
@@ -277,15 +306,24 @@ const Artwork = memo(function Artwork({ puzzle, filled, wrongId, cw, ch }) {
     >
       {puzzle.regions.map((region, index) => {
         const done = filled[index]
+        // Aide : les zones de la couleur active (non remplies) sont teintées
+        // légèrement pour les repérer d'un coup d'œil.
+        const isTarget = !done && region.number === activeColor
+        const fill = done
+          ? colorOf(region.number)
+          : isTarget
+            ? tint(colorOf(region.number), 0.3)
+            : '#fcfcfd'
         return (
           <path
             key={index}
             data-region={index}
             d={region.d}
-            fill={done ? colorOf(region.number) : '#fcfcfd'}
+            fill={fill}
             className={
               'region' +
               (done ? ' region--done' : '') +
+              (isTarget ? ' region--target' : '') +
               (wrongId === index ? ' region--wrong' : '')
             }
           />
@@ -297,7 +335,9 @@ const Artwork = memo(function Artwork({ puzzle, filled, wrongId, cw, ch }) {
             key={`t${index}`}
             x={region.label.x}
             y={region.label.y}
-            className="region__num"
+            className={
+              'region__num' + (region.number === activeColor ? ' region__num--target' : '')
+            }
             fontSize={fontSize}
             dominantBaseline="central"
             textAnchor="middle"
@@ -309,6 +349,12 @@ const Artwork = memo(function Artwork({ puzzle, filled, wrongId, cw, ch }) {
     </svg>
   )
 })
+
+// Convertit un hex #rrggbb en rgba() avec transparence (pour la teinte d'aide).
+function tint(hex, a) {
+  const n = parseInt(hex.slice(1), 16)
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`
+}
 
 // --- Helpers ---------------------------------------------------------------
 
