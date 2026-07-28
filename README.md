@@ -48,7 +48,11 @@ npm run preview  # prévisualiser le build
 | Rosace            | Expert     | 62    |
 | Montagnes         | Expert     | 660   |
 | Forêt             | Expert     | 660   |
-| Lac de montagne   | Photo      | 1632  |
+| Lac de montagne   | Photo      | 2240  |
+| Aurore boréale    | Photo      | 2240  |
+| Galaxie           | Photo      | 2496  |
+| Château féerique  | Photo      | 2464  |
+| Méduses           | Photo      | 2700  |
 
 **Océan**, **Montagnes** et **Forêt** sont générées en « low-poly » : des images
 facettées de plusieurs centaines de triangles ombrés. Le **Lac de montagne** va

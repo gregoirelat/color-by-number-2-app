@@ -17,6 +17,24 @@ const gradC = (stops, t) => {
   }
   return stops[stops.length - 1][1]
 }
+// Bruit organique (somme de sinus) dans ~[-1, 1] pour nuages / aurores.
+const noise2 = (x, y) =>
+  Math.sin(x * 1.3 + y * 0.7) * 0.5 +
+  Math.sin(x * 0.5 - y * 1.1 + 2.1) * 0.3 +
+  Math.sin(x * 2.3 + y * 1.9 + 4.2) * 0.2
+const fbm = (x, y) =>
+  (noise2(x, y) + 0.5 * noise2(x * 2 + 3.1, y * 2 - 1.7) + 0.25 * noise2(x * 4 - 2.3, y * 4 + 5.1)) / 1.75
+// Étoiles déterministes.
+function makeStars(n, w, h, seed) {
+  let a = seed
+  const rnd = () => {
+    a = (a * 1103515245 + 12345) & 0x7fffffff
+    return a / 0x7fffffff
+  }
+  const s = []
+  for (let i = 0; i < n; i++) s.push([rnd() * w, rnd() * h, 0.25 + rnd() * 0.6])
+  return s
+}
 
 // ---------------------------------------------------------------------------
 // Catalogue des dessins.
@@ -677,6 +695,212 @@ const lake = (() => {
 })()
 
 // ===========================================================================
+// 12. Aurore boréale (Photo) — ciel nocturne, aurores, montagnes, reflet.
+// ===========================================================================
+
+const aurora = (() => {
+  const W = 140
+  const H = 100
+  const horizon = 62
+  const stars = makeStars(70, W, horizon - 6, 12345)
+  const ridge = (u) => 60 - 5 * Math.sin(u * 3.4 + 0.5) - 3 * Math.sin(u * 8 + 1.2)
+
+  const skyStops = [
+    [0.0, [8, 10, 26]],
+    [0.5, [16, 22, 50]],
+    [1.0, [26, 40, 66]],
+  ]
+  // Intensité d'un rideau d'aurore ondulant centré sur la courbe cy(x).
+  const curtain = (x, y, cyFn, spread, streak) => {
+    const cy = cyFn(x)
+    const band = Math.exp(-((y - cy) ** 2) / (2 * spread * spread))
+    const str = 0.55 + 0.45 * Math.sin(x * streak + Math.sin(x * 0.3) * 2)
+    return band * str
+  }
+
+  const skyOrAurora = (x, y) => {
+    let c = gradC(skyStops, y / horizon)
+    // étoiles
+    for (const [sx, sy, sb] of stars) {
+      if (Math.abs(x - sx) < 0.7 && Math.abs(y - sy) < 0.7) {
+        c = mixC(c, [255, 255, 240], sb)
+      }
+    }
+    // deux rideaux d'aurore (vert puis violet plus haut)
+    const a1 = curtain(x, y, (xx) => 30 + 6 * Math.sin(xx * 0.08 + 0.5), 10, 0.55)
+    c = mixC(c, [60, 230, 150], clampN(a1, 0, 1) * 0.85)
+    const a2 = curtain(x, y, (xx) => 22 + 7 * Math.sin(xx * 0.06 + 2.5), 7, 0.4)
+    c = mixC(c, [150, 90, 230], clampN(a2, 0, 1) * 0.7)
+    return c
+  }
+
+  const field = (x, y) => {
+    const u = x / W
+    if (y >= ridge(u) && y <= horizon) return [8, 10, 20] // montagnes sombres
+    if (y > horizon) {
+      // lac : reflet atténué des aurores
+      const yr = horizon - (y - horizon) * 0.85
+      let c = skyOrAurora(x, clampN(yr, 0, horizon))
+      c = mixC(c, [10, 14, 30], 0.5)
+      return c
+    }
+    return skyOrAurora(x, y)
+  }
+
+  return voronoiPhoto({ id: 'aurora', name: 'Aurore boréale', difficulty: 'Photo', w: W, h: H, cols: 56, rows: 40, seed: 7, jitter: 0.9, paletteSize: 110, field })
+})()
+
+// ===========================================================================
+// 13. Galaxie (Photo, fantaisie) — nébuleuse colorée et champ d'étoiles.
+// ===========================================================================
+
+const galaxy = (() => {
+  const W = 130
+  const H = 120
+  const core = { x: 0.5 * W, y: 0.46 * H }
+  const stars = makeStars(120, W, H, 777)
+  const bigStars = makeStars(16, W, H, 4242)
+
+  const field = (x, y) => {
+    let c = [7, 8, 20]
+    const dx = x - core.x
+    const dy = y - core.y
+    const glow = Math.exp(-(dx * dx + dy * dy) / (2 * 34 * 34))
+    // nébuleuse : mélange de teintes piloté par le bruit
+    const n = fbm(x * 0.05, y * 0.05)
+    const n2 = fbm(x * 0.11 + 12, y * 0.11 - 6)
+    let neb = mixC([210, 70, 160], [90, 70, 220], clampN(n * 0.5 + 0.5, 0, 1))
+    neb = mixC(neb, [40, 150, 220], clampN(n2 * 0.5 + 0.5, 0, 1) * 0.6)
+    const intensity = clampN(0.35 + 0.7 * n + 1.1 * glow, 0, 1)
+    c = mixC(c, neb, intensity * 0.9)
+    c = mixC(c, [255, 244, 230], glow * 0.6) // cœur lumineux
+    // étoiles
+    for (const [sx, sy, sb] of stars) {
+      if (Math.abs(x - sx) < 0.6 && Math.abs(y - sy) < 0.6) c = mixC(c, [255, 255, 250], sb)
+    }
+    for (const [sx, sy, sb] of bigStars) {
+      const d = Math.hypot(x - sx, y - sy)
+      if (d < 1.6) c = mixC(c, [255, 255, 250], clampN(1 - d / 1.6, 0, 1) * (0.6 + sb * 0.4))
+    }
+    return c
+  }
+
+  return voronoiPhoto({ id: 'galaxy', name: 'Galaxie', difficulty: 'Photo', w: W, h: H, cols: 52, rows: 48, seed: 9, jitter: 0.9, paletteSize: 110, field })
+})()
+
+// ===========================================================================
+// 14. Château féerique (Photo, fantaisie) — silhouette au coucher du soleil.
+// ===========================================================================
+
+const castle = (() => {
+  const W = 140
+  const H = 110
+  const groundY = 90
+  const sun = { x: 0.5 * W, y: 44, r: 12 }
+  const skyStops = [
+    [0.0, [46, 34, 82]],
+    [0.4, [120, 60, 120]],
+    [0.7, [226, 110, 120]],
+    [1.0, [255, 186, 120]],
+  ]
+  // Tours : [xCentre, demiLargeur, yToit]. Toit conique au-dessus.
+  const towers = [
+    [40, 7, 44], [100, 7, 44],
+    [56, 6, 34], [84, 6, 34],
+    [70, 11, 18], // donjon central
+    [26, 5, 56], [114, 5, 56],
+  ]
+  const windows = [
+    [70, 40], [70, 52], [40, 58], [100, 58], [56, 50], [84, 50], [70, 66],
+  ]
+
+  const inTower = (x, y) => {
+    for (const [cx, hw, roofY] of towers) {
+      if (x >= cx - hw && x <= cx + hw && y >= roofY && y <= groundY) return true
+      // toit conique
+      const t = (groundY - y) // not used; roof triangle:
+      void t
+      if (y < roofY && y >= roofY - hw * 1.7) {
+        const wAtY = hw * (1 - (roofY - y) / (hw * 1.7))
+        if (Math.abs(x - cx) <= wAtY) return true
+      }
+    }
+    return false
+  }
+
+  const field = (x, y) => {
+    if (y >= groundY) return [24, 18, 40] // colline sombre
+    if (inTower(x, y)) {
+      // silhouette sombre, avec fenêtres éclairées
+      for (const [wx, wy] of windows) {
+        if (Math.abs(x - wx) < 1.4 && Math.abs(y - wy) < 2.0) return [255, 210, 120]
+      }
+      return [34, 22, 50]
+    }
+    // ciel
+    let c = gradC(skyStops, y / groundY)
+    const glow = Math.exp(-(((x - sun.x) ** 2 + ((y - sun.y) * 1.2) ** 2)) / (2 * 22 * 22))
+    c = mixC(c, [255, 236, 180], glow * 0.9)
+    if (Math.hypot(x - sun.x, y - sun.y) < sun.r) c = [255, 244, 206]
+    return c
+  }
+
+  return voronoiPhoto({ id: 'castle', name: 'Château féerique', difficulty: 'Photo', w: W, h: H, cols: 56, rows: 44, seed: 4, jitter: 0.9, paletteSize: 100, field })
+})()
+
+// ===========================================================================
+// 15. Méduses (Photo, fantaisie) — méduses bioluminescentes dans les abysses.
+// ===========================================================================
+
+const jellyfish = (() => {
+  const W = 120
+  const H = 130
+  const specks = makeStars(90, W, H, 555)
+  // Méduses : [x, y, taille, teinte]
+  const jellies = [
+    [40, 40, 15, [120, 160, 255]],
+    [82, 60, 12, [255, 130, 210]],
+    [58, 92, 10, [130, 255, 220]],
+  ]
+
+  const field = (x, y) => {
+    // fond marin profond en dégradé vertical
+    let c = gradC([[0, [8, 16, 44]], [0.5, [10, 26, 60]], [1, [6, 12, 34]]], y / H)
+    // particules lumineuses
+    for (const [sx, sy, sb] of specks) {
+      if (Math.abs(x - sx) < 0.6 && Math.abs(y - sy) < 0.6) c = mixC(c, [180, 230, 255], sb * 0.7)
+    }
+    for (const [jx, jy, js, hue] of jellies) {
+      // cloche (demi-ellipse) avec halo
+      const dx = (x - jx) / js
+      const dyTop = (y - jy) / (js * 0.8)
+      const inBell = dx * dx + dyTop * dyTop < 1 && y <= jy
+      const halo = Math.exp(-((x - jx) ** 2 + (y - jy) ** 2) / (2 * (js * 1.3) ** 2))
+      c = mixC(c, hue, halo * 0.5)
+      if (inBell) {
+        const shade = 0.6 + 0.4 * (1 - (dx * dx + dyTop * dyTop))
+        c = mixC(c, hue, shade)
+        c = mixC(c, [255, 255, 255], (1 - dx * dx) * 0.15)
+      }
+      // tentacules ondulantes sous la cloche
+      if (y > jy && y < jy + js * 2.6) {
+        const sway = Math.sin(y * 0.4 + jx) * 2.5
+        for (let k = -2; k <= 2; k++) {
+          const tx = jx + k * js * 0.28 + sway
+          if (Math.abs(x - tx) < 0.9) {
+            const fade = clampN(1 - (y - jy) / (js * 2.6), 0, 1)
+            c = mixC(c, hue, fade * 0.7)
+          }
+        }
+      }
+    }
+    return c
+  }
+
+  return voronoiPhoto({ id: 'jellyfish', name: 'Méduses', difficulty: 'Photo', w: W, h: H, cols: 50, rows: 54, seed: 6, jitter: 0.9, paletteSize: 100, field })
+})()
+
+// ===========================================================================
 
 export const puzzles = [
   sunset,
@@ -690,6 +914,10 @@ export const puzzles = [
   mountains,
   forest,
   lake,
+  aurora,
+  galaxy,
+  castle,
+  jellyfish,
 ]
 
 export const difficultyOrder = ['Facile', 'Moyen', 'Difficile', 'Expert', 'Photo']
