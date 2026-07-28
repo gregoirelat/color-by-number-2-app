@@ -448,6 +448,7 @@ body {
 .select__level--difficile { background: #ff5d5d; }
 .select__level--expert { background: #9b5de5; }
 .select__level--photo { background: #1f9e8a; }
+.select__level--enfants { background: #ff6fae; }
 
 .select__grid {
   display: grid;

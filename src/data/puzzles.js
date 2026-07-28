@@ -24,6 +24,24 @@ const noise2 = (x, y) =>
   Math.sin(x * 2.3 + y * 1.9 + 4.2) * 0.2
 const fbm = (x, y) =>
   (noise2(x, y) + 0.5 * noise2(x * 2 + 3.1, y * 2 - 1.7) + 0.25 * noise2(x * 4 - 2.3, y * 4 + 5.1)) / 1.75
+// Géométrie utilitaire pour composer des personnages.
+const d2p = (x, y, cx, cy) => (x - cx) * (x - cx) + (y - cy) * (y - cy)
+const inTri = (px, py, ax, ay, bx, by, cx, cy) => {
+  const s1 = (px - bx) * (ay - by) - (ax - bx) * (py - by)
+  const s2 = (px - cx) * (by - cy) - (bx - cx) * (py - cy)
+  const s3 = (px - ax) * (cy - ay) - (cx - ax) * (py - ay)
+  const neg = s1 < 0 || s2 < 0 || s3 < 0
+  const pos = s1 > 0 || s2 > 0 || s3 > 0
+  return !(neg && pos)
+}
+const distSeg = (px, py, ax, ay, bx, by) => {
+  const dx = bx - ax
+  const dy = by - ay
+  const l2 = dx * dx + dy * dy
+  let t = l2 ? ((px - ax) * dx + (py - ay) * dy) / l2 : 0
+  t = clampN(t, 0, 1)
+  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy))
+}
 // Étoiles déterministes.
 function makeStars(n, w, h, seed) {
   let a = seed
@@ -901,6 +919,176 @@ const jellyfish = (() => {
 })()
 
 // ===========================================================================
+// 16. Arc-en-ciel (Enfants) — arc-en-ciel, soleil, nuages, prairie.
+// ===========================================================================
+
+const rainbowKid = (() => {
+  const W = 140
+  const H = 100
+  const sun = { x: 22, y: 20, r: 13 }
+  const rc = { x: 70, y: 122 }
+  const bands = [
+    [88, [255, 74, 74]], [85, [255, 150, 40]], [82, [255, 214, 60]],
+    [79, [86, 200, 96]], [76, [74, 150, 240]], [73, [128, 92, 220]],
+  ]
+  const clouds = [[26, 78, 11], [114, 80, 12], [86, 26, 8]]
+  const isCloud = (x, y) => {
+    for (const [cx, cy, r] of clouds) {
+      if (d2p(x, y, cx, cy) < r * r) return true
+      if (d2p(x, y, cx - r * 0.85, cy + 2) < (r * 0.7) ** 2) return true
+      if (d2p(x, y, cx + r * 0.85, cy + 2) < (r * 0.72) ** 2) return true
+    }
+    return false
+  }
+  const field = (x, y) => {
+    const g = 87 + 3 * Math.sin(x * 0.09)
+    if (y > g) return mixC([120, 200, 96], [60, 140, 60], clampN((y - g) / 14, 0, 1)) // prairie
+    if (isCloud(x, y)) return mixC([255, 255, 255], [205, 215, 235], clampN((y % 12) / 12, 0, 1) * 0.5)
+    if (d2p(x, y, sun.x, sun.y) < sun.r * sun.r) {
+      const t = Math.sqrt(d2p(x, y, sun.x, sun.y)) / sun.r
+      return mixC([255, 236, 90], [255, 180, 40], t)
+    }
+    const r = Math.hypot(x - rc.x, y - rc.y)
+    for (const [ro, col] of bands) {
+      if (r <= ro && r > ro - 3) return mixC([255, 255, 255], col, 0.82 + 0.18 * ((ro - r) / 3))
+    }
+    return gradC([[0, [150, 205, 245]], [1, [206, 236, 255]]], y / g)
+  }
+  return voronoiPhoto({ id: 'rainbow', name: 'Arc-en-ciel', difficulty: 'Enfants', w: W, h: H, cols: 54, rows: 38, seed: 2, jitter: 0.9, paletteSize: 80, field })
+})()
+
+// ===========================================================================
+// 17. Fusée (Enfants) — fusée, planètes et étoiles.
+// ===========================================================================
+
+const rocket = (() => {
+  const W = 110
+  const H = 150
+  const stars = makeStars(80, W, H, 321)
+  const planets = [[24, 32, 11, [240, 150, 90]], [88, 48, 8, [130, 205, 220]]]
+  const cx = 55
+  const field = (x, y) => {
+    // Hublot
+    if (d2p(x, y, cx, 62) < 6 * 6) {
+      const hl = d2p(x, y, cx - 2, 60) < 4 ? 0.5 : 0
+      return mixC(mixC([90, 170, 230], [25, 70, 130], clampN((y - 56) / 12, 0, 1)), [255, 255, 255], hl)
+    }
+    // Corps (ellipse)
+    const bx = (x - cx) / 13
+    const by = (y - 74) / 28
+    if (bx * bx + by * by < 1 && y >= 50) {
+      return mixC([245, 246, 252], [176, 182, 205], clampN((x - cx) / 13 * 0.5 + 0.42, 0, 1))
+    }
+    // Nez
+    if (inTri(x, y, cx - 13, 52, cx + 13, 52, cx, 24)) {
+      return mixC([232, 74, 74], [255, 200, 200], clampN((cx - x) / 26 + 0.3, 0, 1) * 0.4)
+    }
+    // Ailerons
+    if (inTri(x, y, cx - 13, 90, cx - 24, 108, cx - 13, 104)) return [206, 58, 58]
+    if (inTri(x, y, cx + 13, 90, cx + 24, 108, cx + 13, 104)) return [206, 58, 58]
+    // Flammes
+    if (y > 102 && y < 138) {
+      const wsp = 12 * (1 - (y - 102) / 36)
+      if (Math.abs(x - cx) < wsp) {
+        const t = (y - 102) / 36
+        return mixC([255, 216, 70], [255, 96, 42], clampN(t + fbm(x * 0.3, y * 0.3) * 0.18, 0, 1))
+      }
+    }
+    // Espace
+    let c = gradC([[0, [26, 22, 62]], [1, [8, 8, 26]]], y / H)
+    for (const [px, py, pr, pc] of planets) {
+      if (d2p(x, y, px, py) < pr * pr) return mixC(pc, [255, 255, 255], clampN((px - x) / pr * 0.5 + 0.4, 0, 1) * 0.5)
+    }
+    for (const [sx, sy, sb] of stars) {
+      if (Math.abs(x - sx) < 0.6 && Math.abs(y - sy) < 0.6) c = mixC(c, [255, 255, 240], sb)
+    }
+    return c
+  }
+  return voronoiPhoto({ id: 'rocket', name: 'Fusée', difficulty: 'Enfants', w: W, h: H, cols: 46, rows: 56, seed: 5, jitter: 0.9, paletteSize: 80, field })
+})()
+
+// ===========================================================================
+// 18. Dinosaure (Enfants) — brontosaure rigolo dans la jungle.
+// ===========================================================================
+
+const dino = (() => {
+  const W = 150
+  const H = 110
+  const spots = [[54, 60], [72, 66], [64, 74], [46, 70]]
+  const field = (x, y) => {
+    const green = [96, 178, 78]
+    // Silhouette du dinosaure (union de formes).
+    const body = ((x - 66) / 32) ** 2 + ((y - 66) / 18) ** 2 < 1
+    const neck = distSeg(x, y, 92, 56, 116, 30) < 8
+    const head = d2p(x, y, 120, 27) < 11 * 11
+    const tail = distSeg(x, y, 40, 66, 12, 52) < Math.max(2, 7 * (1 - (40 - x) / 30))
+    const legs =
+      (x > 46 && x < 56 && y > 72 && y < 96) ||
+      (x > 62 && x < 72 && y > 74 && y < 96) ||
+      (x > 78 && x < 88 && y > 74 && y < 96) ||
+      (x > 34 && x < 44 && y > 70 && y < 92)
+    if (body || neck || head || tail || legs) {
+      // œil + sourire sur la tête
+      if (d2p(x, y, 123, 24) < 2 * 2) return [30, 30, 40]
+      if (Math.abs(distSeg(x, y, 116, 32, 124, 32)) < 0.8 && y > 31) return [30, 30, 40]
+      // ventre plus clair
+      if (body && y > 66) return mixC([200, 226, 150], [150, 200, 110], clampN((y - 66) / 18, 0, 1))
+      // taches
+      for (const [sx, sy] of spots) if (d2p(x, y, sx, sy) < 4 * 4) return [70, 140, 60]
+      // corps avec ombrage
+      return mixC([130, 200, 96], [64, 130, 56], clampN((y - 40) / 60, 0, 1))
+    }
+    // Décor : ciel + soleil + prairie
+    const g = 92
+    if (y > g) return mixC([124, 196, 92], [70, 150, 66], clampN((y - g) / 18, 0, 1))
+    if (d2p(x, y, 22, 20) < 12 * 12) return mixC([255, 238, 120], [255, 196, 60], Math.sqrt(d2p(x, y, 22, 20)) / 12)
+    return gradC([[0, [150, 208, 240]], [1, [206, 238, 255]]], y / g)
+  }
+  return voronoiPhoto({ id: 'dino', name: 'Dinosaure', difficulty: 'Enfants', w: W, h: H, cols: 58, rows: 42, seed: 8, jitter: 0.9, paletteSize: 80, field })
+})()
+
+// ===========================================================================
+// 19. Licorne (Enfants) — tête de licorne avec crinière arc-en-ciel.
+// ===========================================================================
+
+const unicorn = (() => {
+  const W = 120
+  const H = 120
+  const maneColors = [[255, 90, 140], [255, 170, 70], [255, 230, 90], [110, 210, 130], [90, 170, 240], [170, 110, 220]]
+  const field = (x, y) => {
+    // Crinière arc-en-ciel (derrière, à droite) : bandes ondulées.
+    const maneX = 74 + 6 * Math.sin(y * 0.12)
+    if (x > maneX && x < maneX + 34 && y > 26 && y < 110) {
+      const idx = Math.floor(((x - maneX) / 34) * maneColors.length) % maneColors.length
+      return mixC([255, 255, 255], maneColors[idx], 0.85)
+    }
+    // Tête (ellipse) + museau
+    const head = ((x - 52) / 24) ** 2 + ((y - 66) / 30) ** 2 < 1
+    if (head) {
+      // œil
+      if (d2p(x, y, 45, 62) < 2.3 * 2.3) return [40, 30, 50]
+      // narine
+      if (d2p(x, y, 39, 84) < 1.5 * 1.5) return [150, 120, 140]
+      // joue rose
+      if (d2p(x, y, 40, 74) < 4 * 4) return mixC([255, 255, 255], [255, 170, 200], 0.5)
+      return mixC([255, 255, 255], [225, 220, 240], clampN((x - 52) / 24 * 0.5 + 0.5, 0, 1) * 0.7)
+    }
+    // Oreille
+    if (inTri(x, y, 62, 44, 74, 42, 68, 24)) return mixC([255, 255, 255], [230, 225, 245], 0.5)
+    // Corne dorée (spirale via bandes), centrée au-dessus du front
+    if (inTri(x, y, 45, 40, 59, 40, 52, 6)) {
+      const band = Math.floor((40 - y) / 3.2) % 2
+      return band ? [255, 214, 96] : [238, 176, 58]
+    }
+    // Fond pastel + étincelles
+    let c = gradC([[0, [255, 226, 245]], [1, [226, 226, 255]]], y / H)
+    if (d2p(x, y, 90, 30) < 1.4 * 1.4 || d2p(x, y, 24, 50) < 1.2 * 1.2 || d2p(x, y, 30, 92) < 1.3 * 1.3) c = [255, 255, 255]
+    return c
+  }
+  return voronoiPhoto({ id: 'unicorn', name: 'Licorne', difficulty: 'Enfants', w: W, h: H, cols: 48, rows: 48, seed: 3, jitter: 0.9, paletteSize: 80, field })
+})()
+
+// ===========================================================================
 
 export const puzzles = [
   sunset,
@@ -918,6 +1106,10 @@ export const puzzles = [
   galaxy,
   castle,
   jellyfish,
+  rainbowKid,
+  rocket,
+  dino,
+  unicorn,
 ]
 
-export const difficultyOrder = ['Facile', 'Moyen', 'Difficile', 'Expert', 'Photo']
+export const difficultyOrder = ['Facile', 'Moyen', 'Difficile', 'Expert', 'Photo', 'Enfants']

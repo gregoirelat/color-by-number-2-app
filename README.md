@@ -53,6 +53,13 @@ npm run preview  # prévisualiser le build
 | Galaxie           | Photo      | 2496  |
 | Château féerique  | Photo      | 2464  |
 | Méduses           | Photo      | 2700  |
+| Arc-en-ciel       | Enfants    | 2052  |
+| Fusée             | Enfants    | 2576  |
+| Dinosaure         | Enfants    | 2436  |
+| Licorne           | Enfants    | 2304  |
+
+La catégorie **Enfants** reprend le même rendu détaillé (cellules irrégulières,
+~80 tons) sur des sujets rigolos et colorés composés par assemblage de formes.
 
 **Océan**, **Montagnes** et **Forêt** sont générées en « low-poly » : des images
 facettées de plusieurs centaines de triangles ombrés. Le **Lac de montagne** va
