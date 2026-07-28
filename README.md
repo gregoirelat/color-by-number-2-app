@@ -37,8 +37,14 @@ npm run preview  # prévisualiser le build
 | Coucher de soleil | Facile     | 9     |
 | Tournesol         | Moyen      | 38    |
 | Montgolfière      | Moyen      | 14    |
+| Poisson           | Moyen      | 13    |
 | Papillon          | Difficile  | 19    |
+| Renard            | Difficile  | 15    |
 | Rosace            | Expert     | 62    |
+| Montagnes         | Expert     | 660   |
+
+Les **Montagnes** sont générées en « low-poly » : une image facettée de plusieurs
+centaines de triangles ombrés (voir `src/data/lowpoly.js`).
 
 ## Structure
 
@@ -46,6 +52,7 @@ npm run preview  # prévisualiser le build
 src/
   data/
     svg.js                  # helpers de formes vectorielles (bande, disque, pétales…)
+    lowpoly.js              # générateur low-poly (maillage triangulaire + champ de couleur)
     puzzles.js              # catalogue des dessins (régions SVG)
   hooks/useColorByNumber.js # logique de jeu + autosave
   components/

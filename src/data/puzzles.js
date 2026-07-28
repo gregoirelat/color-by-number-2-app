@@ -1,4 +1,5 @@
 import { band, disc, ellipse, polygon, smoothClosed } from './svg.js'
+import { lowPoly } from './lowpoly.js'
 
 // ---------------------------------------------------------------------------
 // Catalogue des dessins.
@@ -311,7 +312,176 @@ const rosace = make({
 })
 
 // ===========================================================================
+// 6. Poisson tropical (Moyen)
+// ===========================================================================
 
-export const puzzles = [sunset, sunflower, balloon, butterfly, rosace]
+const fish = make({
+  id: 'fish',
+  name: 'Poisson',
+  difficulty: 'Moyen',
+  viewBox: { w: 100, h: 72 },
+  colors: [
+    { number: 1, hex: '#bfe6ff', name: 'Eau' },
+    { number: 2, hex: '#93d1f2', name: 'Eau profonde' },
+    { number: 3, hex: '#ff9f43', name: 'Corps' },
+    { number: 4, hex: '#ffc46b', name: 'Ventre' },
+    { number: 5, hex: '#ef6b3a', name: 'Nageoires' },
+    { number: 6, hex: '#ffe0a3', name: 'Rayures' },
+    { number: 7, hex: '#ffffff', name: 'Œil' },
+    { number: 8, hex: '#2b2b3a', name: 'Pupille' },
+  ],
+  regions: (() => {
+    const regs = []
+    regs.push({ number: 1, d: 'M 0 0 H 100 V 72 H 0 Z', label: { x: 10, y: 10 } })
+    regs.push({ number: 2, d: band((x) => 54 + 4 * Math.sin(x / 12), 72), label: { x: 12, y: 66 } })
+    // Nageoires (derrière le corps).
+    regs.push({ number: 5, d: polygon([[70, 36], [92, 22], [86, 36], [92, 52]]), label: { x: 84, y: 36 } })
+    regs.push({ number: 5, d: smoothClosed([[40, 20], [52, 6], [60, 20]]), label: { x: 51, y: 15 } })
+    regs.push({ number: 5, d: smoothClosed([[40, 52], [48, 64], [56, 52]]), label: { x: 48, y: 57 } })
+    // Corps
+    const body = [[18, 36], [30, 20], [52, 16], [68, 26], [72, 36], [68, 47], [52, 56], [30, 52]]
+    regs.push({ number: 3, d: smoothClosed(body), label: { x: 40, y: 30 } })
+    // Ventre clair
+    regs.push({ number: 4, d: smoothClosed([[26, 42], [46, 40], [62, 42], [52, 54], [32, 50]]), label: { x: 44, y: 46 } })
+    // Rayures
+    regs.push({ number: 6, d: smoothClosed([[44, 20], [50, 22], [48, 52], [42, 50]]), label: { x: 46, y: 36 } })
+    regs.push({ number: 6, d: smoothClosed([[56, 22], [62, 26], [60, 48], [54, 50]]), label: { x: 58, y: 36 } })
+    // Œil
+    regs.push({ number: 7, d: disc(30, 30, 4.4), label: { x: 30, y: 30 } })
+    regs.push({ number: 8, d: disc(29, 30, 2.1), label: { x: 29, y: 30 } })
+    // Bulles
+    regs.push({ number: 7, d: disc(15, 24, 2.6), label: { x: 15, y: 24 } })
+    regs.push({ number: 7, d: disc(9, 16, 1.8), label: { x: 9, y: 16 } })
+    return regs
+  })(),
+})
+
+// ===========================================================================
+// 7. Renard (Difficile) — face symétrique, tons emboîtés.
+// ===========================================================================
+
+const foxRegions = (() => {
+  const W = 100
+  const mir = (pts) => pts.map(([x, y]) => [W - x, y])
+  const regs = []
+  regs.push({ number: 1, d: 'M 0 0 H 100 V 100 H 0 Z', label: { x: 10, y: 10 } })
+
+  // Oreilles (gauche puis miroir).
+  const earOuter = [[47, 34], [30, 40], [17, 10]]
+  const earInner = [[42, 32], [31, 36], [24, 17]]
+  regs.push({ number: 2, d: smoothClosed(earOuter), label: { x: 30, y: 27 } })
+  regs.push({ number: 5, d: smoothClosed(earInner), label: { x: 31, y: 26 } })
+  regs.push({ number: 2, d: smoothClosed(mir(earOuter)), label: { x: W - 30, y: 27 } })
+  regs.push({ number: 5, d: smoothClosed(mir(earInner)), label: { x: W - 31, y: 26 } })
+
+  // Haut du visage (orange) gauche + miroir.
+  const faceUp = [[50, 30], [30, 40], [26, 58], [42, 70], [50, 64]]
+  regs.push({ number: 2, d: smoothClosed(faceUp), label: { x: 34, y: 46 } })
+  regs.push({ number: 2, d: smoothClosed(mir(faceUp)), label: { x: W - 34, y: 46 } })
+  // Front plus clair.
+  const faceLight = [[50, 34], [39, 44], [38, 58], [50, 60]]
+  regs.push({ number: 3, d: smoothClosed(faceLight), label: { x: 44, y: 48 } })
+  regs.push({ number: 3, d: smoothClosed(mir(faceLight)), label: { x: W - 44, y: 48 } })
+
+  // Joues blanches (bas du visage).
+  const cheek = [[50, 64], [42, 70], [40, 84], [50, 88]]
+  regs.push({ number: 4, d: smoothClosed(cheek), label: { x: 45, y: 78 } })
+  regs.push({ number: 4, d: smoothClosed(mir(cheek)), label: { x: W - 45, y: 78 } })
+
+  // Yeux.
+  regs.push({ number: 5, d: smoothClosed([[41, 52], [36, 55], [41, 58], [45, 55]]), label: { x: 41, y: 55 } })
+  regs.push({ number: 5, d: smoothClosed([[W - 41, 52], [W - 36, 55], [W - 41, 58], [W - 45, 55]]), label: { x: W - 41, y: 55 } })
+
+  // Museau blanc central + truffe.
+  regs.push({ number: 4, d: smoothClosed([[50, 62], [43, 82], [50, 92], [57, 82]]), label: { x: 50, y: 76 } })
+  regs.push({ number: 5, d: smoothClosed([[50, 72], [45, 78], [50, 83], [55, 78]]), label: { x: 50, y: 78 } })
+  return regs
+})()
+
+const fox = make({
+  id: 'fox',
+  name: 'Renard',
+  difficulty: 'Difficile',
+  viewBox: { w: 100, h: 100 },
+  colors: [
+    { number: 1, hex: '#eaf3f7', name: 'Fond' },
+    { number: 2, hex: '#ef7d33', name: 'Orange' },
+    { number: 3, hex: '#ffa24d', name: 'Orange clair' },
+    { number: 4, hex: '#f7f2ec', name: 'Blanc' },
+    { number: 5, hex: '#33303f', name: 'Noir' },
+  ],
+  regions: foxRegions,
+})
+
+// ===========================================================================
+// 8. Montagnes (Expert) — scène low-poly, plusieurs centaines de facettes.
+// ===========================================================================
+
+const mountains = (() => {
+  const w = 120
+  const h = 84
+  const colors = [
+    { number: 1, hex: '#26315e', name: 'Ciel nuit' },
+    { number: 2, hex: '#4a4e8c', name: 'Ciel' },
+    { number: 3, hex: '#8a5e9c', name: 'Ciel mauve' },
+    { number: 4, hex: '#d1738f', name: 'Ciel rose' },
+    { number: 5, hex: '#f0956b', name: 'Horizon' },
+    { number: 6, hex: '#ffcf86', name: 'Halo' },
+    { number: 7, hex: '#fff0c2', name: 'Soleil' },
+    { number: 8, hex: '#9aa6cf', name: 'Cime lointaine' },
+    { number: 9, hex: '#7f8cbb', name: 'Mont lointain' },
+    { number: 10, hex: '#6b6ea6', name: 'Cime' },
+    { number: 11, hex: '#55568a', name: 'Montagne' },
+    { number: 12, hex: '#3c3a67', name: 'Cime proche' },
+    { number: 13, hex: '#2a2749', name: 'Montagne proche' },
+    { number: 14, hex: '#1d1b36', name: 'Lac' },
+  ]
+
+  const ridgeBack = (u) => 30 + 7 * Math.sin(u * 5.2 + 1.5) + 3 * Math.sin(u * 11.3 + 2.1)
+  const ridgeMid = (u) => 40 + 10 * Math.sin(u * 4.3 + 3.0) + 4 * Math.sin(u * 9.1 + 0.4)
+  const ridgeFront = (u) => 50 + 12 * Math.sin(u * 3.1 + 0.6) + 5 * Math.sin(u * 7.7 + 1.2)
+  const sun = { x: 0.72 * w, y: 25, r: 11 }
+
+  // Choix du ton clair/foncé d'une montagne selon l'orientation de la pente.
+  const shade = (ridge, u, light, dark) => {
+    const s = ridge(u + 0.01) - ridge(u - 0.01)
+    return s < 0 ? light : dark
+  }
+
+  const field = (x, y) => {
+    const u = x / w
+    if (y > 72) return 14 // lac au premier plan
+    if (y >= ridgeFront(u)) return shade(ridgeFront, u, 12, 13)
+    if (y >= ridgeMid(u)) return shade(ridgeMid, u, 10, 11)
+    if (y >= ridgeBack(u)) return shade(ridgeBack, u, 8, 9)
+    // Ciel
+    const dSun = Math.hypot(x - sun.x, y - sun.y)
+    if (dSun < sun.r) return 7
+    if (dSun < sun.r + 8) return 6
+    if (y < 9) return 1
+    if (y < 17) return 2
+    if (y < 24) return 3
+    if (y < 30) return 4
+    return 5
+  }
+
+  return lowPoly({
+    id: 'mountains',
+    name: 'Montagnes',
+    difficulty: 'Expert',
+    w,
+    h,
+    cols: 22,
+    rows: 15,
+    seed: 11,
+    jitter: 0.62,
+    colors,
+    field,
+  })
+})()
+
+// ===========================================================================
+
+export const puzzles = [sunset, sunflower, balloon, fish, butterfly, fox, rosace, mountains]
 
 export const difficultyOrder = ['Facile', 'Moyen', 'Difficile', 'Expert']

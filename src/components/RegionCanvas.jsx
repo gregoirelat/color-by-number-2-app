@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 // ---------------------------------------------------------------------------
 // Canevas vectoriel : affiche un dessin comme un ensemble de régions SVG et
@@ -220,13 +220,6 @@ export function RegionCanvas({ puzzle, filled, onPaint }) {
 
   // ----- Rendu -------------------------------------------------------------
 
-  const colorOf = (n) => {
-    const c = puzzle.colors.find((col) => col.number === n)
-    return c ? c.hex : '#fff'
-  }
-  // Taille du numéro relative à la taille du dessin.
-  const fontSize = Math.max(2.4, Math.min(puzzle.viewBox.w, puzzle.viewBox.h) / 26)
-
   return (
     <div className="grid-area">
       <div
@@ -247,46 +240,7 @@ export function RegionCanvas({ puzzle, filled, onPaint }) {
             transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})`,
           }}
         >
-          <svg
-            viewBox={`0 0 ${puzzle.viewBox.w} ${puzzle.viewBox.h}`}
-            width={cw}
-            height={ch}
-            className="art"
-          >
-            {/* Régions colorées ou à colorier. */}
-            {puzzle.regions.map((region, index) => {
-              const done = filled[index]
-              return (
-                <path
-                  key={index}
-                  data-region={index}
-                  d={region.d}
-                  fill={done ? colorOf(region.number) : '#fcfcfd'}
-                  className={
-                    'region' +
-                    (done ? ' region--done' : '') +
-                    (wrongId === index ? ' region--wrong' : '')
-                  }
-                />
-              )
-            })}
-            {/* Numéros (seulement sur les régions non remplies). */}
-            {puzzle.regions.map((region, index) =>
-              filled[index] ? null : (
-                <text
-                  key={`t${index}`}
-                  x={region.label.x}
-                  y={region.label.y}
-                  className="region__num"
-                  fontSize={fontSize}
-                  dominantBaseline="central"
-                  textAnchor="middle"
-                >
-                  {region.number}
-                </text>
-              )
-            )}
-          </svg>
+          <Artwork puzzle={puzzle} filled={filled} wrongId={wrongId} cw={cw} ch={ch} />
         </div>
       </div>
 
@@ -298,6 +252,63 @@ export function RegionCanvas({ puzzle, filled, onPaint }) {
     </div>
   )
 }
+
+// ---------------------------------------------------------------------------
+// Rendu SVG du dessin, isolé dans un composant mémoïsé : il ne se re-rend que
+// lorsqu'une région change (coloriage / feedback), PAS pendant le zoom ou le
+// déplacement. Indispensable pour rester fluide sur les dessins « low-poly »
+// de plusieurs centaines de facettes.
+// ---------------------------------------------------------------------------
+
+const Artwork = memo(function Artwork({ puzzle, filled, wrongId, cw, ch }) {
+  const colorOf = (n) => {
+    const c = puzzle.colors.find((col) => col.number === n)
+    return c ? c.hex : '#fff'
+  }
+  // Taille du numéro relative au dessin.
+  const fontSize = Math.max(1.8, Math.min(puzzle.viewBox.w, puzzle.viewBox.h) / 26)
+
+  return (
+    <svg
+      viewBox={`0 0 ${puzzle.viewBox.w} ${puzzle.viewBox.h}`}
+      width={cw}
+      height={ch}
+      className="art"
+    >
+      {puzzle.regions.map((region, index) => {
+        const done = filled[index]
+        return (
+          <path
+            key={index}
+            data-region={index}
+            d={region.d}
+            fill={done ? colorOf(region.number) : '#fcfcfd'}
+            className={
+              'region' +
+              (done ? ' region--done' : '') +
+              (wrongId === index ? ' region--wrong' : '')
+            }
+          />
+        )
+      })}
+      {puzzle.regions.map((region, index) =>
+        filled[index] ? null : (
+          <text
+            key={`t${index}`}
+            x={region.label.x}
+            y={region.label.y}
+            className="region__num"
+            fontSize={fontSize}
+            dominantBaseline="central"
+            textAnchor="middle"
+          >
+            {region.number}
+          </text>
+        )
+      )}
+    </svg>
+  )
+})
 
 // --- Helpers ---------------------------------------------------------------
 
