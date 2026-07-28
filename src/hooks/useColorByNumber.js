@@ -96,6 +96,12 @@ export function useColorByNumber(puzzle) {
   }
 }
 
+// Nombre de cases déjà remplies pour un dessin (lecture seule, pour l'écran
+// de sélection).
+export function getSavedCount(puzzleId, total) {
+  return loadProgress(puzzleId, total).filter(Boolean).length
+}
+
 // Charge la progression enregistrée, en vérifiant qu'elle correspond à la
 // taille attendue (sinon on repart de zéro).
 function loadProgress(puzzleId, total) {

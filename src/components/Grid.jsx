@@ -1,54 +1,115 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Cell } from './Cell.jsx'
 
 // ---------------------------------------------------------------------------
 // Grille de coloriage avec zoom et déplacement.
 //
 // - Molette : zoom centré sur le curseur.
-// - Pincement tactile (2 doigts) : zoom.
-// - Glisser (souris ou 1 doigt) : déplacement, dès que le zoom > 1.
-// - Un simple tap/clic sur une case la colorie.
+// - Pincement (2 doigts) : zoom + déplacement fluides.
+// - Glisser (souris ou 1 doigt) : déplacement.
+// - Tap/clic net sur une case : coloriage.
 //
-// L'implémentation applique une transform CSS (translate + scale) sur un
-// calque contenant la grille. On distingue un "tap" (colorier) d'un "drag"
-// (déplacer) grâce à la distance parcourue par le pointeur.
+// Au chargement (et quand on change de dessin), la grille est automatiquement
+// ajustée pour tenir entièrement à l'écran — essentiel pour les grands dessins
+// de plusieurs centaines de cases. Les bornes de zoom sont calculées à partir
+// de cet ajustement : on peut toujours revenir à la vue d'ensemble, ou zoomer
+// pour atteindre les petites cases.
 // ---------------------------------------------------------------------------
 
-const MIN_SCALE = 1
-const MAX_SCALE = 6
-const DRAG_THRESHOLD = 6 // pixels au-delà desquels un geste devient un déplacement
+const CELL = 40 // taille d'une case en pixels « contenu » (avant zoom)
 
-export function Grid({ puzzle, filled, flatGrid, activeColor, onPaint }) {
+export function Grid({ puzzle, filled, flatGrid, onPaint }) {
   const viewportRef = useRef(null)
+  const contentRef = useRef(null)
 
-  // Transform courante : échelle + translation (en pixels).
+  // Transform courante : échelle + translation (en pixels écran).
   const [transform, setTransform] = useState({ scale: 1, x: 0, y: 0 })
 
-  // Index de la case ayant reçu un feedback "mauvaise couleur".
+  // Miroir de `transform` en ref pour être lu dans les gestionnaires de
+  // gestes sans dépendances périmées (closures).
+  const transformRef = useRef(transform)
+  useEffect(() => {
+    transformRef.current = transform
+  }, [transform])
+
+  // Bornes de zoom, recalculées à chaque ajustement.
+  const scaleBounds = useRef({ min: 0.2, max: 6 })
+
+  // Feedback « mauvaise couleur ».
   const [wrongIndex, setWrongIndex] = useState(null)
   const wrongTimer = useRef(null)
 
-  // Références de suivi du geste en cours (pas d'état React pour rester fluide).
-  const pointers = useRef(new Map()) // pointerId -> {x, y}
+  // Suivi des pointeurs et du geste en cours (refs : pas de re-render).
+  const pointers = useRef(new Map())
   const gesture = useRef(null)
 
-  // ----- Utilitaires ------------------------------------------------------
+  const clampScale = (s) =>
+    Math.min(scaleBounds.current.max, Math.max(scaleBounds.current.min, s))
 
-  const clampScale = (s) => Math.min(MAX_SCALE, Math.max(MIN_SCALE, s))
+  // ----- Ajustement automatique à l'écran ---------------------------------
 
-  // Applique un zoom autour d'un point (px, py) exprimé dans le viewport.
+  const fitToView = useCallback(() => {
+    const vp = viewportRef.current
+    const content = contentRef.current
+    if (!vp || !content) return
+    const rect = vp.getBoundingClientRect()
+    const cw = content.offsetWidth
+    const ch = content.offsetHeight
+    if (!cw || !ch) return
+
+    const rawFit = Math.min(rect.width / cw, rect.height / ch)
+    const fit = Math.min(rawFit * 0.95, 2) // marge, et on évite des cases géantes
+    scaleBounds.current = {
+      min: Math.min(rawFit * 0.9, fit), // on peut toujours voir tout le dessin
+      max: Math.max(fit * 4, 1.6), // et zoomer assez pour les petites cases
+    }
+    setTransform({
+      scale: fit,
+      x: (rect.width - cw * fit) / 2,
+      y: (rect.height - ch * fit) / 2,
+    })
+  }, [])
+
+  // Ajuste au montage et à chaque changement de dessin.
+  useLayoutEffect(() => {
+    fitToView()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [puzzle.id])
+
+  // Réajuste si la fenêtre change de taille.
+  useEffect(() => {
+    const onResize = () => fitToView()
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [fitToView])
+
+  // ----- Zoom centré sur un point (molette / boutons) ---------------------
+
   const zoomAround = useCallback((nextScale, px, py) => {
     setTransform((prev) => {
       const scale = clampScale(nextScale)
       const ratio = scale / prev.scale
-      // On garde le point sous le curseur fixe pendant le zoom.
       const x = px - (px - prev.x) * ratio
       const y = py - (py - prev.y) * ratio
-      return constrain({ scale, x, y }, viewportRef.current)
+      return constrain({ scale, x, y }, viewportRef.current, contentRef.current)
     })
   }, [])
 
-  // ----- Feedback "mauvaise couleur" --------------------------------------
+  const handleWheel = useCallback(
+    (e) => {
+      e.preventDefault()
+      const rect = viewportRef.current.getBoundingClientRect()
+      const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15
+      zoomAround(
+        transformRef.current.scale * factor,
+        e.clientX - rect.left,
+        e.clientY - rect.top
+      )
+    },
+    [zoomAround]
+  )
+
+  // ----- Feedback « mauvaise couleur » ------------------------------------
 
   const flashWrong = useCallback((index) => {
     setWrongIndex(index)
@@ -64,51 +125,45 @@ export function Grid({ puzzle, filled, flatGrid, activeColor, onPaint }) {
     [onPaint, filled, flashWrong]
   )
 
-  // ----- Molette (zoom) ---------------------------------------------------
+  // ----- Gestes (pointer events) ------------------------------------------
 
-  const handleWheel = useCallback(
-    (e) => {
-      e.preventDefault()
-      const rect = viewportRef.current.getBoundingClientRect()
-      const px = e.clientX - rect.left
-      const py = e.clientY - rect.top
-      const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15
-      setTransform((prev) => {
-        const scale = clampScale(prev.scale * factor)
-        const ratio = scale / prev.scale
-        const x = px - (px - prev.x) * ratio
-        const y = py - (py - prev.y) * ratio
-        return constrain({ scale, x, y }, viewportRef.current)
-      })
-    },
-    []
-  )
+  // Coordonnées d'un point relatif au viewport.
+  const toLocal = (clientX, clientY) => {
+    const rect = viewportRef.current.getBoundingClientRect()
+    return { x: clientX - rect.left, y: clientY - rect.top }
+  }
 
-  // ----- Pointer events (déplacement + pincement) -------------------------
+  const startPinch = () => {
+    const [a, b] = [...pointers.current.values()]
+    const mid = midpoint(a, b)
+    gesture.current = {
+      mode: 'pinch',
+      startDist: distance(a, b),
+      startScale: transformRef.current.scale,
+      startMid: toLocal(mid.x, mid.y),
+      startTf: { ...transformRef.current },
+    }
+  }
 
   const onPointerDown = useCallback((e) => {
-    viewportRef.current.setPointerCapture(e.pointerId)
+    try {
+      viewportRef.current.setPointerCapture(e.pointerId)
+    } catch {
+      // Certains navigateurs peuvent refuser la capture : ce n'est pas bloquant.
+    }
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
 
     if (pointers.current.size === 1) {
-      // Début d'un geste simple : peut devenir un tap ou un drag.
       gesture.current = {
-        mode: 'pending',
+        mode: 'pending', // deviendra tap, drag...
         startX: e.clientX,
         startY: e.clientY,
-        originX: transform.x,
-        originY: transform.y,
+        startTf: { ...transformRef.current },
       }
     } else if (pointers.current.size === 2) {
-      // Début d'un pincement.
-      const [a, b] = [...pointers.current.values()]
-      gesture.current = {
-        mode: 'pinch',
-        startDist: distance(a, b),
-        startScale: transform.scale,
-      }
+      startPinch()
     }
-  }, [transform])
+  }, [])
 
   const onPointerMove = useCallback((e) => {
     if (!pointers.current.has(e.pointerId)) return
@@ -116,15 +171,27 @@ export function Grid({ puzzle, filled, flatGrid, activeColor, onPaint }) {
     const g = gesture.current
     if (!g) return
 
+    // Pincement : zoom + déplacement en gardant le point sous les doigts fixe.
     if (g.mode === 'pinch' && pointers.current.size >= 2) {
       const [a, b] = [...pointers.current.values()]
       const dist = distance(a, b)
-      const rect = viewportRef.current.getBoundingClientRect()
-      const mid = midpoint(a, b)
-      zoomAround(g.startScale * (dist / g.startDist), mid.x - rect.left, mid.y - rect.top)
+      const midClient = midpoint(a, b)
+      const mid = toLocal(midClient.x, midClient.y)
+      const scale = clampScale(g.startScale * (dist / g.startDist))
+      // Coordonnée « contenu » qui était sous le milieu au départ.
+      const cx = (g.startMid.x - g.startTf.x) / g.startScale
+      const cy = (g.startMid.y - g.startTf.y) / g.startScale
+      setTransform(
+        constrain(
+          { scale, x: mid.x - cx * scale, y: mid.y - cy * scale },
+          viewportRef.current,
+          contentRef.current
+        )
+      )
       return
     }
 
+    // Passage tap -> drag une fois le seuil de déplacement franchi.
     if (g.mode === 'pending') {
       const moved = Math.hypot(e.clientX - g.startX, e.clientY - g.startY)
       if (moved > DRAG_THRESHOLD) g.mode = 'drag'
@@ -133,20 +200,23 @@ export function Grid({ puzzle, filled, flatGrid, activeColor, onPaint }) {
     if (g.mode === 'drag') {
       const dx = e.clientX - g.startX
       const dy = e.clientY - g.startY
-      setTransform((prev) =>
-        constrain({ scale: prev.scale, x: g.originX + dx, y: g.originY + dy }, viewportRef.current)
+      setTransform(
+        constrain(
+          { scale: g.startTf.scale, x: g.startTf.x + dx, y: g.startTf.y + dy },
+          viewportRef.current,
+          contentRef.current
+        )
       )
     }
-  }, [zoomAround])
+  }, [])
 
   const onPointerUp = useCallback((e) => {
     const g = gesture.current
     pointers.current.delete(e.pointerId)
 
-    // Un tap net (pas de déplacement) sur une case la colorie.
-    // On retrouve la case via les coordonnées plutôt que via e.target :
-    // à cause de la capture de pointeur, e.target pointe sur le viewport.
-    if (g && g.mode === 'pending') {
+    // Tap net (sans déplacement) => coloriage. On retrouve la case par ses
+    // coordonnées : à cause de la capture de pointeur, e.target vise le viewport.
+    if (g && g.mode === 'pending' && !g.noTap) {
       const el = document.elementFromPoint(e.clientX, e.clientY)
       const target = el && el.closest('[data-index]')
       if (target) handlePaint(Number(target.getAttribute('data-index')))
@@ -155,25 +225,25 @@ export function Grid({ puzzle, filled, flatGrid, activeColor, onPaint }) {
     if (pointers.current.size === 0) {
       gesture.current = null
     } else if (pointers.current.size === 1) {
-      // On repasse d'un pincement à un éventuel déplacement.
-      const [only] = [...pointers.current.values()]
+      // On passait d'un pincement à un seul doigt : on prépare un déplacement,
+      // sans déclencher de coloriage accidentel au relâchement.
+      const [only] = [...pointers.current.entries()]
       gesture.current = {
         mode: 'pending',
-        startX: only.x,
-        startY: only.y,
-        originX: transform.x,
-        originY: transform.y,
+        noTap: true,
+        startX: only[1].x,
+        startY: only[1].y,
+        startTf: { ...transformRef.current },
       }
     }
-  }, [handlePaint, transform])
+  }, [handlePaint])
 
-  // ----- Contrôles de zoom (boutons) --------------------------------------
+  // ----- Boutons de zoom ---------------------------------------------------
 
   const zoomButton = (factor) => () => {
     const rect = viewportRef.current.getBoundingClientRect()
-    zoomAround(transform.scale * factor, rect.width / 2, rect.height / 2)
+    zoomAround(transformRef.current.scale * factor, rect.width / 2, rect.height / 2)
   }
-  const resetView = () => setTransform({ scale: 1, x: 0, y: 0 })
 
   return (
     <div className="grid-area">
@@ -187,10 +257,10 @@ export function Grid({ puzzle, filled, flatGrid, activeColor, onPaint }) {
         onPointerCancel={onPointerUp}
       >
         <div
+          ref={contentRef}
           className="grid"
           style={{
-            gridTemplateColumns: `repeat(${puzzle.width}, 1fr)`,
-            width: `${puzzle.width * 40}px`,
+            gridTemplateColumns: `repeat(${puzzle.width}, ${CELL}px)`,
             transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})`,
           }}
         >
@@ -203,8 +273,6 @@ export function Grid({ puzzle, filled, flatGrid, activeColor, onPaint }) {
                   hex={color ? color.hex : '#fff'}
                   isFilled={filled[index]}
                   wrong={wrongIndex === index}
-                  // Le clic réel est géré au niveau du viewport (tap vs drag),
-                  // mais on garde onPaint pour l'accessibilité clavier.
                   onPaint={() => handlePaint(index)}
                 />
               </div>
@@ -215,14 +283,16 @@ export function Grid({ puzzle, filled, flatGrid, activeColor, onPaint }) {
 
       <div className="zoom-controls">
         <button type="button" onClick={zoomButton(1 / 1.3)} aria-label="Dézoomer">−</button>
-        <button type="button" onClick={resetView} aria-label="Réinitialiser la vue">⤢</button>
+        <button type="button" onClick={fitToView} aria-label="Voir tout le dessin">⤢</button>
         <button type="button" onClick={zoomButton(1.3)} aria-label="Zoomer">+</button>
       </div>
     </div>
   )
 }
 
-// --- Helpers géométriques ---------------------------------------------------
+// --- Constantes & helpers ---------------------------------------------------
+
+const DRAG_THRESHOLD = 6 // px au-delà desquels un geste devient un déplacement
 
 function distance(a, b) {
   return Math.hypot(a.x - b.x, a.y - b.y)
@@ -231,23 +301,19 @@ function midpoint(a, b) {
   return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
 }
 
-// Empêche la grille de partir trop loin hors de l'écran quand on la déplace.
-function constrain(t, viewport) {
-  if (!viewport) return t
+// Empêche la grille de sortir complètement de l'écran, tout en autorisant son
+// centrage quand elle est plus petite que le viewport.
+function constrain(t, viewport, content) {
+  if (!viewport || !content) return t
   const rect = viewport.getBoundingClientRect()
-  const content = viewport.querySelector('.grid')
-  if (!content) return t
   const w = content.offsetWidth * t.scale
   const h = content.offsetHeight * t.scale
-  // Marge autorisée : on garde toujours une partie de la grille visible.
-  const margin = 40
-  const minX = Math.min(0, rect.width - w) - margin
-  const maxX = margin
-  const minY = Math.min(0, rect.height - h) - margin
-  const maxY = margin
+  const rangeX = rect.width - w
+  const rangeY = rect.height - h
+  const clamp = (v, a, b) => Math.min(Math.max(v, Math.min(a, b)), Math.max(a, b))
   return {
     scale: t.scale,
-    x: Math.min(maxX, Math.max(minX, t.x)),
-    y: Math.min(maxY, Math.max(minY, t.y)),
+    x: clamp(t.x, 0, rangeX),
+    y: clamp(t.y, 0, rangeY),
   }
 }

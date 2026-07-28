@@ -1,89 +1,22 @@
-import { useEffect, useState } from 'react'
-import { puzzle } from './data/puzzle.js'
-import { useColorByNumber } from './hooks/useColorByNumber.js'
-import { Grid } from './components/Grid.jsx'
-import { Palette } from './components/Palette.jsx'
+import { useState } from 'react'
+import { puzzles } from './data/puzzles.js'
+import { PuzzleSelect } from './components/PuzzleSelect.jsx'
+import { Game } from './components/Game.jsx'
 
 // ---------------------------------------------------------------------------
-// Composant racine : assemble la grille, la palette et l'en-tête.
+// Composant racine : gère la navigation entre l'écran de sélection des dessins
+// et une partie de coloriage.
 // ---------------------------------------------------------------------------
 
 export default function App() {
-  const {
-    filled,
-    flatGrid,
-    activeColor,
-    progress,
-    isComplete,
-    selectColor,
-    paintCell,
-    reset,
-  } = useColorByNumber(puzzle)
+  const [currentId, setCurrentId] = useState(null)
 
-  // Affiche l'animation de célébration une seule fois lors du passage à 100%.
-  const [celebrate, setCelebrate] = useState(false)
-  useEffect(() => {
-    if (isComplete) {
-      setCelebrate(true)
-      const t = setTimeout(() => setCelebrate(false), 4000)
-      return () => clearTimeout(t)
-    }
-  }, [isComplete])
+  const puzzle = puzzles.find((p) => p.id === currentId)
 
-  const totalDone = filled.filter(Boolean).length
-  const totalPct = Math.round((totalDone / filled.length) * 100)
+  if (!puzzle) {
+    return <PuzzleSelect onSelect={setCurrentId} />
+  }
 
-  return (
-    <div className="app">
-      <header className="app__header">
-        <h1 className="app__title">{puzzle.name}</h1>
-        <div className="app__progress">
-          <span>{totalPct}%</span>
-          <button type="button" className="app__reset" onClick={reset}>
-            Recommencer
-          </button>
-        </div>
-      </header>
-
-      <Grid
-        puzzle={puzzle}
-        filled={filled}
-        flatGrid={flatGrid}
-        activeColor={activeColor}
-        onPaint={paintCell}
-      />
-
-      <Palette
-        colors={puzzle.colors}
-        progress={progress}
-        activeColor={activeColor}
-        onSelect={selectColor}
-      />
-
-      {celebrate && <Celebration />}
-    </div>
-  )
-}
-
-// Petite animation de confettis + message quand le dessin est terminé.
-function Celebration() {
-  const pieces = Array.from({ length: 40 })
-  const colors = ['#ff5d8f', '#7ed957', '#ffd166', '#4d96ff', '#c77dff']
-  return (
-    <div className="celebration" role="status">
-      <div className="celebration__banner">🎉 Bravo, dessin terminé ! 🎉</div>
-      {pieces.map((_, i) => (
-        <span
-          key={i}
-          className="confetti"
-          style={{
-            left: `${Math.random() * 100}%`,
-            backgroundColor: colors[i % colors.length],
-            animationDelay: `${Math.random() * 0.8}s`,
-            animationDuration: `${1.8 + Math.random() * 1.4}s`,
-          }}
-        />
-      ))}
-    </div>
-  )
+  // La `key` force le remontage (donc un état propre) quand on change de dessin.
+  return <Game key={puzzle.id} puzzle={puzzle} onBack={() => setCurrentId(null)} />
 }

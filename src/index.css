@@ -54,6 +54,24 @@ body {
   font-size: 18px;
   margin: 0;
   font-weight: 700;
+  flex: 1;
+  text-align: center;
+}
+
+.app__back {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  border-radius: 8px;
+  width: 34px;
+  height: 34px;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+.app__back:hover {
+  background: #eef1f7;
 }
 
 .app__progress {
@@ -91,12 +109,12 @@ body {
   inset: 0;
   overflow: hidden;
   touch-action: none; /* on gère nous-mêmes zoom/pan */
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
 .grid {
+  position: absolute;
+  top: 0;
+  left: 0;
   display: grid;
   transform-origin: 0 0;
   gap: 1px;
@@ -302,4 +320,150 @@ body {
 @keyframes fall {
   0% { transform: translateY(-20px) rotate(0deg); opacity: 1; }
   100% { transform: translateY(100vh) rotate(540deg); opacity: 0.9; }
+}
+
+/* ----- Écran de sélection des dessins ------------------------------------ */
+
+.select {
+  min-height: 100%;
+  overflow-y: auto;
+  padding: 20px 16px 40px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.select__header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.select__title {
+  font-size: 26px;
+  margin: 0 0 4px;
+}
+
+.select__subtitle {
+  margin: 0;
+  color: var(--muted);
+}
+
+.select__group {
+  margin-bottom: 28px;
+}
+
+.select__level {
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 0 0 12px;
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 999px;
+  color: #fff;
+}
+
+/* Couleur du badge selon la difficulté. */
+.select__level--facile { background: #3fbf5f; }
+.select__level--moyen { background: #ff9f1c; }
+.select__level--difficile { background: #ff5d5d; }
+.select__level--expert { background: #9b5de5; }
+
+.select__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 14px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--panel);
+  cursor: pointer;
+  overflow: hidden;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+}
+
+.card__preview {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  background: #f0f3f9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+}
+
+.thumb {
+  width: 100%;
+  height: 100%;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
+.card__done {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #3fbf5f;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.card__body {
+  padding: 10px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.card__name {
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.card__meta {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.card__bar {
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 2px;
+}
+
+.card__bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+}
+
+.card__pct {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+/* L'écran de sélection peut défiler : on lève le verrou global. */
+body:has(.select) {
+  overflow: auto;
 }
