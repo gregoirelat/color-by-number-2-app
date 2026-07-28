@@ -1,5 +1,5 @@
 import { band, disc, ellipse, polygon, smoothClosed } from './svg.js'
-import { lowPoly, lowPolyPhoto } from './lowpoly.js'
+import { lowPoly, voronoiPhoto } from './lowpoly.js'
 
 // Petits utilitaires de couleur pour les scènes « photo ».
 const clampN = (v, a, b) => Math.min(b, Math.max(a, v))
@@ -661,16 +661,16 @@ const lake = (() => {
     return c
   }
 
-  return lowPolyPhoto({
+  return voronoiPhoto({
     id: 'lake',
     name: 'Lac de montagne',
     difficulty: 'Photo',
     w: W,
     h: H,
-    cols: 40,
-    rows: 28,
+    cols: 48,
+    rows: 34,
     seed: 3,
-    jitter: 0.5,
+    jitter: 0.9,
     paletteSize: 30,
     field,
   })

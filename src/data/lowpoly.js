@@ -127,6 +127,117 @@ export function lowPolyPhoto({
   }
 }
 
+// --- Mode « photo » à cellules de Voronoï (formes irrégulières) -------------
+//
+// Au lieu d'un maillage de triangles, on répartit des germes (points) et chaque
+// cellule regroupe la zone la plus proche de son germe : on obtient des formes
+// polygonales IRRÉGULIÈRES (ni triangles, ni carrés). La cellule est calculée
+// exactement par intersection de demi-plans (bissectrices) avec les germes
+// voisins. La couleur vient d'un champ continu ; la palette est calculée par
+// k-means, comme pour lowPolyPhoto.
+
+export function voronoiPhoto({ id, name, difficulty, w, h, cols, rows, seed = 7, jitter = 0.85, paletteSize = 28, field }) {
+  const rnd = mulberry32(seed)
+  const gx = w / cols
+  const gy = h / rows
+
+  const grid = []
+  const seeds = []
+  for (let j = 0; j < rows; j++) {
+    grid[j] = []
+    for (let i = 0; i < cols; i++) {
+      const x = clampNum((i + 0.5) * gx + (rnd() - 0.5) * gx * jitter, 0, w)
+      const y = clampNum((j + 0.5) * gy + (rnd() - 0.5) * gy * jitter, 0, h)
+      const s = { x, y, i, j }
+      grid[j][i] = s
+      seeds.push(s)
+    }
+  }
+
+  const rect = [[0, 0], [w, 0], [w, h], [0, h]]
+  const cells = []
+  for (const s of seeds) {
+    let poly = rect
+    for (let dj = -2; dj <= 2 && poly.length >= 3; dj++) {
+      for (let di = -2; di <= 2; di++) {
+        if (di === 0 && dj === 0) continue
+        const nj = s.j + dj
+        const ni = s.i + di
+        if (nj < 0 || nj >= rows || ni < 0 || ni >= cols) continue
+        poly = clipHalf(poly, s, grid[nj][ni])
+        if (poly.length < 3) break
+      }
+    }
+    if (poly.length >= 3) cells.push(poly)
+  }
+
+  const cents = cells.map(polyCentroid)
+  const samples = cents.map(([x, y]) => field(x, y))
+  const { centers, assign } = kmeans(samples, paletteSize, rnd, 12)
+  const order = centers.map((c, i) => i).sort((a, b) => lum(centers[a]) - lum(centers[b]))
+  const newNumber = new Array(centers.length)
+  const colors = order.map((oldIdx, pos) => {
+    newNumber[oldIdx] = pos + 1
+    return { number: pos + 1, hex: rgbToHex(centers[oldIdx]), name: `Ton ${pos + 1}` }
+  })
+
+  const regions = cells.map((poly, i) => ({
+    number: newNumber[assign[i]],
+    d: polygon(poly),
+    label: { x: cents[i][0], y: cents[i][1] },
+  }))
+
+  return {
+    id, name, difficulty, viewBox: { w, h }, colors, regions,
+    regionCount: regions.length,
+    smooth: true,
+    numberSize: Math.min(gx, gy) * 0.42,
+  }
+}
+
+const clampNum = (v, a, b) => Math.min(b, Math.max(a, v))
+
+// Coupe un polygone par la bissectrice entre s et t (on garde le côté de s).
+function clipHalf(poly, s, t) {
+  const nx = t.x - s.x
+  const ny = t.y - s.y
+  const c = (t.x * t.x + t.y * t.y - s.x * s.x - s.y * s.y) / 2
+  const f = (p) => p[0] * nx + p[1] * ny - c // on garde f <= 0 (plus près de s)
+  const out = []
+  for (let i = 0; i < poly.length; i++) {
+    const A = poly[i]
+    const B = poly[(i + 1) % poly.length]
+    const fa = f(A)
+    const fb = f(B)
+    if (fa <= 0) out.push(A)
+    if ((fa < 0 && fb > 0) || (fa > 0 && fb < 0)) {
+      const k = fa / (fa - fb)
+      out.push([A[0] + (B[0] - A[0]) * k, A[1] + (B[1] - A[1]) * k])
+    }
+  }
+  return out
+}
+
+function polyCentroid(poly) {
+  let a = 0
+  let cx = 0
+  let cy = 0
+  for (let i = 0; i < poly.length; i++) {
+    const [x0, y0] = poly[i]
+    const [x1, y1] = poly[(i + 1) % poly.length]
+    const cr = x0 * y1 - x1 * y0
+    a += cr
+    cx += (x0 + x1) * cr
+    cy += (y0 + y1) * cr
+  }
+  a *= 0.5
+  if (Math.abs(a) < 1e-6) {
+    const n = poly.length
+    return [poly.reduce((s, p) => s + p[0], 0) / n, poly.reduce((s, p) => s + p[1], 0) / n]
+  }
+  return [cx / (6 * a), cy / (6 * a)]
+}
+
 // --- k-means simple en espace RGB ------------------------------------------
 
 function d2(a, b) {
