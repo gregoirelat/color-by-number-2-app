@@ -365,6 +365,190 @@ const rosace = make({
 })
 
 // ===========================================================================
+// Illustrations vectorielles façon « Happy Color » (aplats + trait visible).
+// ===========================================================================
+
+// --- Chat mignon (Difficile) ---
+const cat = make({
+  id: 'cat',
+  name: 'Chat',
+  difficulty: 'Difficile',
+  viewBox: { w: 100, h: 100 },
+  colors: [
+    { number: 1, hex: '#dbeaf2', name: 'Fond' },
+    { number: 2, hex: '#9aa4ad', name: 'Gris' },
+    { number: 3, hex: '#c3cbd2', name: 'Gris clair' },
+    { number: 4, hex: '#6f7880', name: 'Gris foncé' },
+    { number: 5, hex: '#ffffff', name: 'Blanc' },
+    { number: 6, hex: '#ff9fb2', name: 'Rose' },
+    { number: 7, hex: '#3a3f4a', name: 'Noir' },
+    { number: 8, hex: '#8ad2c4', name: 'Yeux' },
+  ],
+  regions: (() => {
+    const mir = (pts) => pts.map(([x, y]) => [100 - x, y])
+    const r = []
+    r.push({ number: 1, d: 'M0 0H100V100H0Z', label: { x: 10, y: 10 } })
+    // Queue
+    r.push({ number: 2, d: smoothClosed([[70, 92], [82, 84], [90, 68], [86, 54], [80, 58], [83, 70], [74, 84], [66, 90]]), label: { x: 82, y: 70 } })
+    // Corps
+    r.push({ number: 2, d: smoothClosed([[32, 96], [30, 66], [40, 52], [60, 52], [70, 66], [68, 96]]), label: { x: 40, y: 84 } })
+    // Ventre
+    r.push({ number: 3, d: smoothClosed([[42, 95], [40, 68], [50, 60], [60, 68], [58, 95]]), label: { x: 50, y: 82 } })
+    // Pattes
+    r.push({ number: 5, d: ellipse(42, 94, 6, 4), label: { x: 42, y: 94 } })
+    r.push({ number: 5, d: ellipse(58, 94, 6, 4), label: { x: 58, y: 94 } })
+    // Oreilles
+    r.push({ number: 2, d: polygon([[34, 34], [30, 10], [50, 28]]), label: { x: 36, y: 22 } })
+    r.push({ number: 2, d: polygon(mir([[34, 34], [30, 10], [50, 28]])), label: { x: 64, y: 22 } })
+    r.push({ number: 6, d: polygon([[35, 30], [33, 16], [45, 27]]), label: { x: 38, y: 24 } })
+    r.push({ number: 6, d: polygon(mir([[35, 30], [33, 16], [45, 27]])), label: { x: 62, y: 24 } })
+    // Tête
+    r.push({ number: 2, d: disc(50, 46, 20), label: { x: 34, y: 40 } })
+    // Rayures front
+    r.push({ number: 4, d: polygon([[49, 27], [51, 27], [50, 38]]), label: { x: 50, y: 32 } })
+    r.push({ number: 4, d: polygon([[44, 30], [47, 30], [46, 39]]), label: { x: 45, y: 34 } })
+    r.push({ number: 4, d: polygon([[53, 30], [56, 30], [54, 39]]), label: { x: 55, y: 34 } })
+    // Yeux
+    r.push({ number: 8, d: ellipse(43, 45, 4, 5.5), label: { x: 43, y: 45 } })
+    r.push({ number: 8, d: ellipse(57, 45, 4, 5.5), label: { x: 57, y: 45 } })
+    r.push({ number: 7, d: ellipse(43, 46, 1.7, 3.5), label: { x: 43, y: 46 } })
+    r.push({ number: 7, d: ellipse(57, 46, 1.7, 3.5), label: { x: 57, y: 46 } })
+    // Museau
+    r.push({ number: 5, d: smoothClosed([[42, 53], [50, 51], [58, 53], [54, 63], [46, 63]]), label: { x: 50, y: 58 } })
+    r.push({ number: 6, d: polygon([[47, 55], [53, 55], [50, 59]]), label: { x: 50, y: 56 } })
+    return r
+  })(),
+})
+
+// --- Cactus en pot (Moyen) ---
+const cactus = make({
+  id: 'cactus',
+  name: 'Cactus',
+  difficulty: 'Moyen',
+  viewBox: { w: 100, h: 100 },
+  colors: [
+    { number: 1, hex: '#fdf1dc', name: 'Fond' },
+    { number: 2, hex: '#4f9e5a', name: 'Vert' },
+    { number: 3, hex: '#7ec86a', name: 'Vert clair' },
+    { number: 4, hex: '#e08a52', name: 'Pot' },
+    { number: 5, hex: '#b9663a', name: 'Pot foncé' },
+    { number: 6, hex: '#ff7fa3', name: 'Fleur' },
+    { number: 7, hex: '#ffd23f', name: 'Cœur' },
+  ],
+  regions: (() => {
+    const mir = (pts) => pts.map(([x, y]) => [100 - x, y])
+    const r = []
+    r.push({ number: 1, d: 'M0 0H100V100H0Z', label: { x: 10, y: 10 } })
+    // Bras
+    r.push({ number: 2, d: smoothClosed([[45, 60], [34, 56], [29, 44], [36, 40], [45, 50]]), label: { x: 36, y: 50 } })
+    r.push({ number: 2, d: smoothClosed(mir([[45, 60], [34, 56], [29, 44], [36, 40], [45, 50]])), label: { x: 64, y: 50 } })
+    // Corps
+    r.push({ number: 2, d: smoothClosed([[43, 76], [41, 48], [46, 32], [54, 32], [59, 48], [57, 76]]), label: { x: 44, y: 62 } })
+    // Reflet
+    r.push({ number: 3, d: smoothClosed([[48, 74], [47, 50], [50, 40], [52, 50], [51, 74]]), label: { x: 50, y: 60 } })
+    // Pot
+    r.push({ number: 4, d: polygon([[35, 76], [65, 76], [61, 96], [39, 96]]), label: { x: 50, y: 88 } })
+    r.push({ number: 5, d: polygon([[31, 68], [69, 68], [66, 77], [34, 77]]), label: { x: 50, y: 72 } })
+    // Fleurs
+    r.push({ number: 6, d: disc(50, 30, 5), label: { x: 50, y: 30 } })
+    r.push({ number: 7, d: disc(50, 30, 2), label: { x: 50, y: 30 } })
+    r.push({ number: 6, d: disc(40, 38, 4), label: { x: 40, y: 38 } })
+    r.push({ number: 7, d: disc(40, 38, 1.6), label: { x: 40, y: 38 } })
+    r.push({ number: 6, d: disc(60, 38, 4), label: { x: 60, y: 38 } })
+    r.push({ number: 7, d: disc(60, 38, 1.6), label: { x: 60, y: 38 } })
+    return r
+  })(),
+})
+
+// --- Cupcake (Moyen) ---
+const cupcake = make({
+  id: 'cupcake',
+  name: 'Cupcake',
+  difficulty: 'Moyen',
+  viewBox: { w: 100, h: 110 },
+  colors: [
+    { number: 1, hex: '#fdeef5', name: 'Fond' },
+    { number: 2, hex: '#ff9fb2', name: 'Caissette' },
+    { number: 3, hex: '#e06d8a', name: 'Caissette foncé' },
+    { number: 4, hex: '#fff0c2', name: 'Glaçage' },
+    { number: 5, hex: '#ffd6e6', name: 'Glaçage rose' },
+    { number: 6, hex: '#ff4d5e', name: 'Cerise' },
+    { number: 7, hex: '#7ed957', name: 'Bonbon vert' },
+    { number: 8, hex: '#4d96ff', name: 'Bonbon bleu' },
+  ],
+  regions: (() => {
+    const r = []
+    r.push({ number: 1, d: 'M0 0H100V110H0Z', label: { x: 10, y: 10 } })
+    // Caissette (base + rayures)
+    r.push({ number: 2, d: polygon([[34, 74], [66, 74], [70, 101], [30, 101]]), label: { x: 50, y: 90 } })
+    r.push({ number: 3, d: polygon([[42, 74], [47, 74], [45, 101], [39, 101]]), label: { x: 42, y: 90 } })
+    r.push({ number: 3, d: polygon([[54, 74], [59, 74], [61, 101], [55, 101]]), label: { x: 58, y: 90 } })
+    // Glaçage (dôme large et arrondi)
+    r.push({ number: 4, d: smoothClosed([[27, 77], [28, 62], [35, 53], [44, 47], [50, 45], [56, 47], [65, 53], [72, 62], [73, 77]]), label: { x: 34, y: 68 } })
+    r.push({ number: 5, d: smoothClosed([[35, 75], [40, 60], [48, 54], [50, 53], [52, 54], [60, 60], [65, 75], [50, 78]]), label: { x: 50, y: 66 } })
+    // Cerise
+    r.push({ number: 6, d: disc(50, 43, 6), label: { x: 50, y: 43 } })
+    // Bonbons
+    r.push({ number: 7, d: ellipse(38, 66, 2.4, 1.6), label: { x: 38, y: 66 } })
+    r.push({ number: 8, d: ellipse(62, 64, 2.4, 1.6), label: { x: 62, y: 64 } })
+    r.push({ number: 8, d: ellipse(45, 71, 2.4, 1.6), label: { x: 45, y: 71 } })
+    r.push({ number: 7, d: ellipse(57, 71, 2.4, 1.6), label: { x: 57, y: 71 } })
+    return r
+  })(),
+})
+
+// --- Hibou (Difficile) ---
+const owl = make({
+  id: 'owl',
+  name: 'Hibou',
+  difficulty: 'Difficile',
+  viewBox: { w: 100, h: 110 },
+  colors: [
+    { number: 1, hex: '#cfe8ef', name: 'Fond' },
+    { number: 2, hex: '#fff3c9', name: 'Lune' },
+    { number: 3, hex: '#6a8fbf', name: 'Corps' },
+    { number: 4, hex: '#4a6a95', name: 'Ailes' },
+    { number: 5, hex: '#cfe0f0', name: 'Ventre' },
+    { number: 6, hex: '#ffffff', name: 'Yeux' },
+    { number: 7, hex: '#ffb03b', name: 'Iris' },
+    { number: 8, hex: '#2b2f3a', name: 'Pupille' },
+    { number: 9, hex: '#ff8c42', name: 'Bec & pattes' },
+    { number: 10, hex: '#8b5a2b', name: 'Branche' },
+  ],
+  regions: (() => {
+    const mir = (pts) => pts.map(([x, y]) => [100 - x, y])
+    const r = []
+    r.push({ number: 1, d: 'M0 0H100V110H0Z', label: { x: 10, y: 10 } })
+    r.push({ number: 2, d: disc(78, 24, 10), label: { x: 78, y: 24 } })
+    // Branche
+    r.push({ number: 10, d: polygon([[8, 96], [92, 96], [92, 103], [8, 103]]), label: { x: 25, y: 99 } })
+    // Aigrettes
+    r.push({ number: 3, d: polygon([[36, 40], [30, 24], [44, 36]]), label: { x: 37, y: 33 } })
+    r.push({ number: 3, d: polygon(mir([[36, 40], [30, 24], [44, 36]])), label: { x: 63, y: 33 } })
+    // Corps
+    r.push({ number: 3, d: smoothClosed([[30, 92], [26, 60], [34, 42], [50, 34], [66, 42], [74, 60], [70, 92]]), label: { x: 34, y: 76 } })
+    // Ailes
+    r.push({ number: 4, d: smoothClosed([[32, 58], [24, 66], [28, 86], [37, 80]]), label: { x: 30, y: 72 } })
+    r.push({ number: 4, d: smoothClosed(mir([[32, 58], [24, 66], [28, 86], [37, 80]])), label: { x: 70, y: 72 } })
+    // Ventre
+    r.push({ number: 5, d: smoothClosed([[40, 90], [37, 62], [50, 52], [63, 62], [60, 90]]), label: { x: 50, y: 82 } })
+    // Yeux
+    r.push({ number: 6, d: disc(42, 50, 10), label: { x: 42, y: 50 } })
+    r.push({ number: 6, d: disc(58, 50, 10), label: { x: 58, y: 50 } })
+    r.push({ number: 7, d: disc(42, 50, 5), label: { x: 42, y: 50 } })
+    r.push({ number: 7, d: disc(58, 50, 5), label: { x: 58, y: 50 } })
+    r.push({ number: 8, d: disc(42, 50, 2.4), label: { x: 42, y: 50 } })
+    r.push({ number: 8, d: disc(58, 50, 2.4), label: { x: 58, y: 50 } })
+    // Bec
+    r.push({ number: 9, d: polygon([[50, 53], [46, 59], [54, 59]]), label: { x: 50, y: 56 } })
+    // Pattes
+    r.push({ number: 9, d: polygon([[42, 92], [38, 96], [46, 96]]), label: { x: 42, y: 94 } })
+    r.push({ number: 9, d: polygon([[58, 92], [54, 96], [62, 96]]), label: { x: 58, y: 94 } })
+    return r
+  })(),
+})
+
+// ===========================================================================
 // 6. Poisson tropical (Moyen)
 // ===========================================================================
 
@@ -1095,8 +1279,12 @@ export const puzzles = [
   sunflower,
   balloon,
   fish,
+  cactus,
+  cupcake,
   butterfly,
   fox,
+  cat,
+  owl,
   ocean,
   rosace,
   mountains,

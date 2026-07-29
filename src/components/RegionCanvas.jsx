@@ -352,6 +352,7 @@ const Artwork = memo(function Artwork({ puzzle, filledRef, colorMap, cw, ch }) {
   // relative à la taille du dessin.
   const fontSize = puzzle.numberSize || Math.max(1.8, Math.min(puzzle.viewBox.w, puzzle.viewBox.h) / 26)
   const smooth = !!puzzle.smooth
+  const faint = !!puzzle.faint
 
   // Le rendu React est « neutre » : état rempli / non rempli seulement. La
   // surbrillance de la couleur active est appliquée ensuite en DOM direct
@@ -368,6 +369,7 @@ const Artwork = memo(function Artwork({ puzzle, filledRef, colorMap, cw, ch }) {
             base={colorOf(region.number)}
             done={done}
             smooth={smooth}
+            faint={faint}
             lx={region.label.x}
             ly={region.label.y}
             num={region.number}
@@ -379,7 +381,7 @@ const Artwork = memo(function Artwork({ puzzle, filledRef, colorMap, cw, ch }) {
   )
 })
 
-const RegionItem = memo(function RegionItem({ index, d, base, done, smooth, lx, ly, num, fontSize }) {
+const RegionItem = memo(function RegionItem({ index, d, base, done, smooth, faint, lx, ly, num, fontSize }) {
   const stroke = done && smooth ? base : undefined
   return (
     <>
@@ -388,7 +390,12 @@ const RegionItem = memo(function RegionItem({ index, d, base, done, smooth, lx, 
         d={d}
         fill={done ? base : '#fcfcfd'}
         stroke={stroke}
-        className={'region' + (done ? ' region--done' : '') + (stroke ? ' region--blend' : '')}
+        className={
+          'region' +
+          (done ? ' region--done' : '') +
+          (stroke ? ' region--blend' : '') +
+          (done && faint ? ' region--faint' : '')
+        }
       />
       {!done && (
         <text

@@ -77,6 +77,7 @@ export function lowPoly({ id, name, difficulty, w, h, cols, rows, seed = 7, jitt
     id, name, difficulty, viewBox: { w, h }, colors, regions,
     regionCount: regions.length,
     numberSize: Math.min(w / cols, h / rows) * 0.5, // numéro adapté à la facette
+    faint: true, // facettes : trait discret une fois rempli
   }
 }
 

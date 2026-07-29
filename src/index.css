@@ -128,17 +128,18 @@ body {
 /* ----- Régions à colorier ------------------------------------------------ */
 
 .region {
-  stroke: #7f8794;
+  stroke: #6b7482;
   stroke-width: 0.35;
   stroke-linejoin: round;
   cursor: pointer;
   transition: fill 0.18s ease;
 }
 
-/* Région remplie : contour plus discret pour laisser respirer les couleurs. */
+/* Région remplie : on garde un trait sombre visible (style « line art » à la
+   Happy Color) pour les illustrations vectorielles. */
 .region--done {
-  stroke: rgba(0, 0, 0, 0.14);
-  stroke-width: 0.25;
+  stroke: rgba(28, 32, 42, 0.5);
+  stroke-width: 0.3;
 }
 
 /* Dessins « photo » : la facette remplie se fond dans ses voisines
@@ -146,6 +147,13 @@ body {
 .region--blend {
   stroke-width: 0.5;
   transition: none;
+}
+
+/* Scènes low-poly triangulaires : trait très discret une fois rempli, pour ne
+   pas faire ressortir la grille de facettes. */
+.region--faint {
+  stroke: rgba(0, 0, 0, 0.1);
+  stroke-width: 0.2;
 }
 
 /* Feedback quand on tape avec la mauvaise couleur. */

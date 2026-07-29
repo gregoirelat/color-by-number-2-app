@@ -42,8 +42,12 @@ npm run preview  # prévisualiser le build
 | Tournesol         | Moyen      | 38    |
 | Montgolfière      | Moyen      | 14    |
 | Poisson           | Moyen      | 13    |
+| Cactus            | Moyen      | 13    |
+| Cupcake           | Moyen      | 11    |
 | Papillon          | Difficile  | 19    |
 | Renard            | Difficile  | 15    |
+| Chat              | Difficile  | 20    |
+| Hibou             | Difficile  | 18    |
 | Océan             | Difficile  | 520   |
 | Rosace            | Expert     | 62    |
 | Montagnes         | Expert     | 660   |
@@ -111,6 +115,11 @@ Dans `src/data/puzzles.js`, ajouter un objet au tableau `puzzles` :
 Les helpers de `svg.js` (`band`, `disc`, `ellipse`, `polygon`, `smoothClosed`)
 et les fabriques de `puzzles.js` (`petalRing`, `centroid`) facilitent la
 génération de formes lisses et de couronnes de pétales.
+
+Les illustrations vectorielles (chat, cactus, cupcake, hibou, tournesol,
+papillon, renard…) sont conçues dans l'esprit de l'appli **Happy Color** :
+aplats de couleurs, zones organiques qui suivent le dessin, et un trait sombre
+qui reste visible une fois colorié (« line art »).
 
 ## Technique
 
