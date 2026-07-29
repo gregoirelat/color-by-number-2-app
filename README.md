@@ -15,6 +15,31 @@ npm run build    # build de production
 npm run preview  # prévisualiser le build
 ```
 
+## Installer / télécharger l'application
+
+L'appli peut se lancer et s'installer de plusieurs façons :
+
+- **Fichier autonome** : après `npm run build`, on peut empaqueter toute l'appli
+  dans un seul fichier HTML (CSS + JS inlinés) à double-cliquer — il s'ouvre dans
+  le navigateur et fonctionne hors-ligne, sans installation.
+
+- **PWA (installable)** : le build est une *Progressive Web App*. Une fois le
+  contenu de `dist/` servi en HTTPS (ou via `npm run preview`), le navigateur
+  propose « Installer » : l'appli s'ajoute à l'écran d'accueil / au menu Démarrer,
+  avec son icône, et fonctionne hors-ligne (service worker + précache).
+
+- **Application de bureau (Electron)** : génère un exécutable natif.
+
+  ```bash
+  npm run electron        # lance l'appli bureau (dev)
+  npm run app:dist:win    # crée un installeur Windows (.exe / NSIS)
+  npm run app:dist:mac    # crée un .dmg (à faire sur macOS)
+  npm run app:dist:linux  # crée un AppImage
+  ```
+
+  Le résultat est écrit dans `release/`. Chaque plateforme se construit de
+  préférence sur l'OS correspondant (macOS pour le `.dmg`).
+
 ## Fonctionnalités
 
 - **Écran de sélection** : dessins classés par difficulté (Facile → Expert),

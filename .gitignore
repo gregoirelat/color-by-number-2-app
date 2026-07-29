@@ -8,6 +8,13 @@ dist
 dist-ssr
 *.local
 
+# Electron / packaging output
+release
+*.AppImage
+
+# App autonome générée (build)
+color-by-number.html
+
 # Logs
 logs
 *.log
