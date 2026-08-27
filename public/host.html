@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Kahoot Clone — Écran de jeu</title>
+    <link rel="stylesheet" href="/css/style.css" />
+  </head>
+  <body>
+    <div class="container">
+      <!-- LOBBY -->
+      <section id="lobby">
+        <h1 class="brand" style="margin-top: 0.5rem" id="lobbyTitle">Quiz Party</h1>
+        <p class="subtitle">Scanne le QR code ou va sur <strong id="siteUrl"></strong> et entre le PIN</p>
+
+        <div class="lobby-grid">
+          <div class="card center">
+            <div class="small">PIN de la partie</div>
+            <div class="pin-display" id="pin">------</div>
+            <div style="margin-top: 1rem">
+              <span class="count-badge"><span id="playerCount">0</span> joueur·euse·s</span>
+            </div>
+            <div class="players" id="players" style="margin-top: 1rem"></div>
+            <p class="small">Clique sur un pseudo pour l'expulser.</p>
+          </div>
+          <div class="qr-box">
+            <img id="qr" alt="QR code de connexion" />
+            <div class="join-url" id="joinUrl"></div>
+          </div>
+        </div>
+
+        <div class="center" style="margin-top: 2rem">
+          <button class="btn-primary btn-big" id="btnStart" disabled>Démarrer la partie</button>
+          <p class="small" id="startHint">En attente de joueurs…</p>
+        </div>
+      </section>
+
+      <!-- QUESTION -->
+      <section id="question" class="hidden">
+        <div class="question-header">
+          <span class="count-badge">Question <span id="qIndex"></span>/<span id="qTotal"></span></span>
+          <div class="timer" id="timer">–</div>
+          <span class="count-badge"><span id="respCount">0</span> réponses</span>
+        </div>
+        <div class="card question-text" id="qText"></div>
+        <div class="answers-grid" id="answers" style="margin-top: 1rem"></div>
+        <div class="center" style="margin-top: 1.5rem">
+          <button class="btn-ghost" id="btnSkip">⏭️ Passer / Révéler</button>
+        </div>
+      </section>
+
+      <!-- REVEAL -->
+      <section id="reveal" class="hidden">
+        <div class="card question-text" id="revealText"></div>
+        <div class="answers-grid" id="revealAnswers" style="margin-top: 1rem"></div>
+        <div class="center" style="margin-top: 1.5rem">
+          <button class="btn-primary btn-big" id="btnScoreboard">Voir le classement</button>
+        </div>
+      </section>
+
+      <!-- SCOREBOARD -->
+      <section id="scoreboard" class="hidden">
+        <h2 style="text-align: center">🏆 Classement</h2>
+        <div class="leaderboard" id="lbList"></div>
+        <div class="center" style="margin-top: 2rem">
+          <button class="btn-primary btn-big" id="btnNext">Question suivante</button>
+        </div>
+      </section>
+
+      <!-- END -->
+      <section id="end" class="hidden">
+        <h1 class="brand">🏁 Partie terminée !</h1>
+        <div class="podium" id="podium"></div>
+        <div class="leaderboard" id="finalList"></div>
+        <div class="center" style="margin-top: 2rem">
+          <a href="/"><button class="btn-primary btn-big">Nouvelle partie</button></a>
+        </div>
+      </section>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/js/host.js"></script>
+  </body>
+</html>

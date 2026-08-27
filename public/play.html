@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Kahoot Clone — Rejoindre</title>
+    <link rel="stylesheet" href="/css/style.css" />
+  </head>
+  <body>
+    <div class="container">
+      <!-- JOIN -->
+      <section id="join" class="center" style="min-height: 70vh">
+        <h1 class="brand">🎉 Quiz Party</h1>
+        <div class="card" style="width: min(420px, 90vw)">
+          <label class="small">PIN de la partie</label>
+          <input id="pinInput" inputmode="numeric" placeholder="123456" maxlength="8" style="font-size: 1.5rem; text-align: center; letter-spacing: 0.3rem" />
+          <label class="small" style="margin-top: 1rem; display: block">Ton pseudo</label>
+          <input id="nameInput" placeholder="Ton nom" maxlength="20" />
+          <button class="btn-primary btn-big" id="btnJoin" style="width: 100%; margin-top: 1rem">Rejoindre</button>
+          <p class="status-line" id="joinStatus"></p>
+        </div>
+      </section>
+
+      <!-- WAIT -->
+      <section id="wait" class="hidden center" style="min-height: 70vh">
+        <h1 class="brand" id="waitName"></h1>
+        <p class="subtitle">Tu es dans la partie ✅</p>
+        <p class="status-line">En attente du démarrage… Regarde l'écran principal !</p>
+      </section>
+
+      <!-- ANSWER -->
+      <section id="answer" class="hidden">
+        <div class="question-header">
+          <span class="count-badge">Q<span id="pIndex"></span>/<span id="pTotal"></span></span>
+          <div class="timer" id="pTimer">–</div>
+        </div>
+        <div class="player-answers" id="pAnswers"></div>
+      </section>
+
+      <!-- ANSWERED -->
+      <section id="answered" class="hidden center" style="min-height: 70vh">
+        <h2>Réponse envoyée ✅</h2>
+        <p class="status-line">En attente des autres joueurs…</p>
+      </section>
+
+      <!-- RESULT -->
+      <section id="result" class="hidden center" style="min-height: 70vh">
+        <div class="result-banner" id="resultBanner"></div>
+        <div id="resultInfo" style="margin-top: 1rem"></div>
+      </section>
+
+      <!-- FINAL -->
+      <section id="final" class="hidden center" style="min-height: 70vh">
+        <h1 class="brand">🏁 Terminé !</h1>
+        <div id="finalInfo"></div>
+        <a href="/play"><button class="btn-ghost btn-big" style="margin-top: 1rem">Rejouer</button></a>
+      </section>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/js/play.js"></script>
+  </body>
+</html>
