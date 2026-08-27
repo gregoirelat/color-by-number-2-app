@@ -1,4 +1,5 @@
-// Vue joueur (mobile) : rejoint via PIN (pré-rempli par le QR code), répond, voit ses résultats.
+// Vue joueur (mobile) : rejoint via PIN (pré-rempli par le QR code), répond,
+// voit ses résultats, et se reconnecte automatiquement en cas de coupure réseau.
 
 const SHAPES = ["▲", "◆", "●", "■"];
 const socket = io();
@@ -9,11 +10,50 @@ function show(name) {
   sections.forEach((s) => el(s).classList.toggle("hidden", s !== name));
 }
 
+const SESSION_KEY = "quizparty:session";
+function saveSession(pin, token, name) {
+  try {
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify({ pin, token, name }));
+  } catch {}
+}
+function loadSession() {
+  try {
+    return JSON.parse(sessionStorage.getItem(SESSION_KEY));
+  } catch {
+    return null;
+  }
+}
+function clearSession() {
+  try {
+    sessionStorage.removeItem(SESSION_KEY);
+  } catch {}
+}
+
 // Pré-remplit le PIN depuis l'URL (?pin=...) fournie par le QR code.
 const params = new URLSearchParams(window.location.search);
 if (params.get("pin")) el("pinInput").value = params.get("pin");
 
 let timerInterval = null;
+let myName = "";
+
+// Tente une reconnexion automatique à chaque (re)connexion socket.
+socket.on("connect", () => {
+  const sess = loadSession();
+  if (sess && sess.pin && sess.token) {
+    socket.emit("player:rejoin", { pin: sess.pin, token: sess.token }, (res) => {
+      if (res && res.ok) {
+        myName = res.name;
+        el("waitName").textContent = res.name;
+        // L'état exact (question/résultat) est renvoyé par le serveur juste après.
+        if (res.state === "lobby") show("wait");
+      } else {
+        // Session invalide -> on l'oublie et on montre l'écran de connexion.
+        clearSession();
+        show("join");
+      }
+    });
+  }
+});
 
 el("btnJoin").onclick = doJoin;
 el("nameInput").addEventListener("keydown", (e) => {
@@ -39,6 +79,8 @@ function doJoin() {
       el("joinStatus").textContent = "⚠️ " + res.error;
       return;
     }
+    myName = res.name;
+    saveSession(res.pin, res.token, res.name);
     el("waitName").textContent = res.name;
     show("wait");
   });
@@ -51,18 +93,17 @@ socket.on("game:question", (q) => {
   el("pTotal").textContent = q.total;
 
   const wrap = el("pAnswers");
+  wrap.classList.toggle("tf", q.type === "truefalse");
   wrap.innerHTML = "";
+  const labels = q.type === "truefalse" ? ["Vrai", "Faux"] : SHAPES;
   for (let i = 0; i < q.answersCount; i++) {
     const btn = document.createElement("button");
     btn.className = `a${i}`;
-    btn.textContent = SHAPES[i];
-    btn.onclick = () => {
-      socket.emit("player:answer", { answerIndex: i });
-    };
+    btn.textContent = labels[i];
+    btn.onclick = () => socket.emit("player:answer", { answerIndex: i });
     wrap.appendChild(btn);
   }
 
-  // Chrono.
   clearInterval(timerInterval);
   const endsAt = q.startedAt + q.time * 1000;
   const tick = () => {
@@ -103,6 +144,7 @@ socket.on("game:result", (r) => {
 // --- Fin ---
 socket.on("game:end", (r) => {
   show("final");
+  clearSession();
   el("finalInfo").innerHTML = `
     <div style="font-size:2rem;font-weight:800">${medal(r.rank)} Rang ${r.rank ?? "-"}/${r.totalPlayers}</div>
     <div class="status-line">Score final : <strong>${r.score}</strong></div>`;
@@ -112,12 +154,13 @@ function medal(rank) {
   return { 1: "🥇", 2: "🥈", 3: "🥉" }[rank] || "🎮";
 }
 
-// --- Événements divers ---
 socket.on("game:kicked", () => {
+  clearSession();
   alert("Tu as été expulsé·e de la partie.");
   window.location.href = "/play";
 });
 socket.on("game:closed", () => {
+  clearSession();
   show("join");
   el("joinStatus").textContent = "La partie a été fermée par l'hôte.";
 });

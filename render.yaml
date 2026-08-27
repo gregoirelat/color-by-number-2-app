@@ -1,0 +1,16 @@
+# Déploiement en un clic sur Render (https://render.com).
+# Render fournit une URL HTTPS publique et gère les WebSockets (Socket.IO)
+# ainsi que les en-têtes X-Forwarded-* — le QR code pointera vers la bonne URL.
+services:
+  - type: web
+    name: quiz-party
+    runtime: node
+    plan: free
+    buildCommand: npm ci
+    startCommand: node server/index.js
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: NODE_ENV
+        value: production

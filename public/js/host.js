@@ -1,4 +1,5 @@
 // Vue hôte : pilote la partie (lobby -> questions -> reveal -> scoreboard -> podium).
+// Gère la reconnexion de l'hôte (jeton en sessionStorage) après une coupure.
 
 const SHAPES = ["▲", "◆", "●", "■"];
 const socket = io();
@@ -9,34 +10,65 @@ function show(name) {
   sections.forEach((s) => el(s).classList.toggle("hidden", s !== name));
 }
 
-// Récupère le quiz préparé par l'éditeur.
-let quiz;
+const HOST_KEY = "quizparty:host";
+function saveHostSession(pin, token) {
+  try {
+    sessionStorage.setItem(HOST_KEY, JSON.stringify({ pin, token }));
+  } catch {}
+}
+function loadHostSession() {
+  try {
+    return JSON.parse(sessionStorage.getItem(HOST_KEY));
+  } catch {
+    return null;
+  }
+}
+
+let quiz = null;
 try {
   quiz = JSON.parse(sessionStorage.getItem("quizparty:quiz"));
-} catch {
-  quiz = null;
-}
-if (!quiz || !quiz.questions?.length) {
-  // Pas de quiz -> retour accueil.
-  window.location.href = "/";
-}
+} catch {}
 
 el("siteUrl").textContent = window.location.host;
 
-// Crée la partie côté serveur.
-socket.on("connect", () => {
-  socket.emit("host:create", quiz, async (res) => {
-    el("pin").textContent = res.pin;
-    el("lobbyTitle").textContent = res.title;
-    document.title = `PIN ${res.pin} — Quiz Party`;
-    // QR code.
-    try {
-      const r = await fetch(`/api/qr?pin=${res.pin}`);
-      const data = await r.json();
-      el("qr").src = data.dataUrl;
-      el("joinUrl").textContent = data.joinUrl;
-    } catch {}
+async function setupLobby(pin, title) {
+  el("pin").textContent = pin;
+  el("lobbyTitle").textContent = title;
+  document.title = `PIN ${pin} — Quiz Party`;
+  try {
+    const r = await fetch(`/api/qr?pin=${pin}`);
+    const data = await r.json();
+    el("qr").src = data.dataUrl;
+    el("joinUrl").textContent = data.joinUrl;
+  } catch {}
+}
+
+function createGame() {
+  if (!quiz || !quiz.questions?.length) {
+    window.location.href = "/";
+    return;
+  }
+  socket.emit("host:create", quiz, (res) => {
+    saveHostSession(res.pin, res.hostToken);
+    setupLobby(res.pin, res.title);
   });
+}
+
+// À chaque (re)connexion : reconnexion si session existante, sinon création.
+socket.on("connect", () => {
+  const hs = loadHostSession();
+  if (hs && hs.pin && hs.token) {
+    socket.emit("host:rejoin", { pin: hs.pin, token: hs.token }, (res) => {
+      if (res && res.ok) {
+        setupLobby(res.pin, res.title);
+        // Le serveur renvoie ensuite l'état courant (question/reveal/etc.).
+      } else {
+        createGame();
+      }
+    });
+  } else {
+    createGame();
+  }
 });
 
 socket.on("lobby:update", ({ players, count }) => {
@@ -63,7 +95,16 @@ el("btnNext").onclick = () => socket.emit("host:next");
 el("btnSkip").onclick = () => socket.emit("host:next");
 el("btnScoreboard").onclick = () => socket.emit("host:scoreboard");
 
-// --- Question ---
+function setImage(imgEl, url) {
+  if (url) {
+    imgEl.src = url;
+    imgEl.classList.remove("hidden");
+  } else {
+    imgEl.removeAttribute("src");
+    imgEl.classList.add("hidden");
+  }
+}
+
 let timerInterval = null;
 socket.on("game:question", (q) => {
   show("question");
@@ -71,17 +112,18 @@ socket.on("game:question", (q) => {
   el("qTotal").textContent = q.total;
   el("qText").textContent = q.text;
   el("respCount").textContent = "0";
+  setImage(el("qImage"), q.image);
 
   const wrap = el("answers");
   wrap.innerHTML = "";
+  const labels = q.type === "truefalse" ? ["Vrai", "Faux"] : SHAPES;
   q.answers.forEach((a, i) => {
     const d = document.createElement("div");
     d.className = `answer a${i}`;
-    d.innerHTML = `<span class="shape">${SHAPES[i]}</span><span>${escapeHtml(a)}</span>`;
+    d.innerHTML = `<span class="shape">${labels[i]}</span><span>${escapeHtml(a)}</span>`;
     wrap.appendChild(d);
   });
 
-  // Chrono affiché.
   clearInterval(timerInterval);
   const endsAt = q.startedAt + q.time * 1000;
   const tick = () => {
@@ -97,34 +139,32 @@ socket.on("game:answerCount", ({ responded }) => {
   el("respCount").textContent = responded;
 });
 
-// --- Reveal ---
 socket.on("game:reveal", (r) => {
   clearInterval(timerInterval);
   show("reveal");
   el("revealText").textContent = r.text;
-  const max = Math.max(1, ...r.distribution);
+  setImage(el("revealImage"), r.image);
   const wrap = el("revealAnswers");
   wrap.innerHTML = "";
+  const labels = r.answers.length === 2 && r.answers[0] === "Vrai" ? ["Vrai", "Faux"] : SHAPES;
   r.answers.forEach((a, i) => {
     const d = document.createElement("div");
     const isCorrect = i === r.correctIndex;
     d.className = `answer a${i} ${isCorrect ? "correct" : "dim"}`;
     d.innerHTML = `
-      <span class="shape">${SHAPES[i]}</span>
+      <span class="shape">${labels[i]}</span>
       <span>${escapeHtml(a)} ${isCorrect ? "✔️" : ""}</span>
       <span class="count">${r.distribution[i]}</span>`;
     wrap.appendChild(d);
   });
 });
 
-// --- Scoreboard ---
 socket.on("game:scoreboard", ({ leaderboard, isLast }) => {
   show("scoreboard");
   renderLeaderboard(el("lbList"), leaderboard, true);
   el("btnNext").textContent = isLast ? "Voir le podium 🏁" : "Question suivante";
 });
 
-// --- Fin ---
 socket.on("game:end", ({ leaderboard }) => {
   show("end");
   renderPodium(leaderboard);
@@ -146,7 +186,7 @@ function renderLeaderboard(container, list, showGain) {
 }
 
 function renderPodium(list) {
-  const order = [1, 0, 2]; // 2e, 1er, 3e
+  const order = [1, 0, 2];
   const podium = el("podium");
   podium.innerHTML = "";
   order.forEach((idx) => {

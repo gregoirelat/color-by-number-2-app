@@ -122,6 +122,28 @@ textarea:focus {
   display: none !important;
 }
 
+select {
+  font: inherit;
+  border-radius: 10px;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  background: var(--bg-2);
+  color: var(--text);
+  padding: 0.5rem 0.7rem;
+}
+
+.q-image {
+  display: block;
+  margin: 1rem auto 0;
+  max-height: 34vh;
+  max-width: 100%;
+  border-radius: var(--radius);
+  object-fit: contain;
+}
+
+.player-answers.tf button {
+  font-size: 2rem;
+}
+
 .brand {
   font-size: clamp(2rem, 6vw, 3.4rem);
   font-weight: 800;

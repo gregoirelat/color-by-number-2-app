@@ -1,5 +1,11 @@
 // Logique de jeu — indépendante du transport (Socket.IO).
 // Un GameManager détient toutes les parties en mémoire, indexées par PIN.
+//
+// Les joueurs sont identifiés par un `playerId` (jeton stable généré à
+// l'inscription), et NON par l'ID de socket : cela permet la reconnexion
+// (le socket change, le playerId reste, le score est conservé).
+
+import { randomUUID } from "node:crypto";
 
 const PIN_LENGTH = 6;
 const MAX_PLAYERS = 300; // marge confortable au-dessus de la centaine visée
@@ -25,15 +31,17 @@ export const GameState = {
 };
 
 class Game {
-  constructor(pin, hostSocketId, quiz) {
+  constructor(pin, hostToken, quiz) {
     this.pin = pin;
-    this.hostSocketId = hostSocketId;
-    this.quiz = quiz; // { title, questions: [{ text, answers[], correctIndex, time, image? }] }
+    this.hostToken = hostToken; // jeton stable de l'hôte (reconnexion)
+    this.hostSocketId = null;
+    this.hostConnected = true;
+    this.quiz = quiz; // { title, questions: [{ text, answers[], correctIndex, time, image?, type }] }
     this.state = GameState.LOBBY;
-    this.players = new Map(); // socketId -> { id, name, score, streak, answered, lastPoints }
+    this.players = new Map(); // playerId -> { playerId, socketId, name, score, streak, answered, lastPoints, connected }
     this.currentIndex = -1;
     this.questionStartedAt = 0;
-    this.answersThisRound = new Map(); // socketId -> { answerIndex, timeMs }
+    this.answersThisRound = new Map(); // playerId -> { answerIndex, timeMs }
     this.timer = null;
     this.createdAt = Date.now();
   }
@@ -48,35 +56,54 @@ class Game {
   }
 
   addPlayer(socketId, name) {
-    if (this.players.size >= MAX_PLAYERS) {
+    const connectedCount = [...this.players.values()].filter((p) => p.connected).length;
+    if (connectedCount >= MAX_PLAYERS) {
       return { error: "Partie complète." };
     }
     const trimmed = String(name || "").trim().slice(0, 20);
     if (!trimmed) return { error: "Pseudo invalide." };
     const taken = [...this.players.values()].some(
-      (p) => p.name.toLowerCase() === trimmed.toLowerCase()
+      (p) => p.connected && p.name.toLowerCase() === trimmed.toLowerCase()
     );
     if (taken) return { error: "Ce pseudo est déjà pris." };
 
-    const player = { id: socketId, name: trimmed, score: 0, streak: 0, answered: false, lastPoints: 0 };
-    this.players.set(socketId, player);
+    const player = {
+      playerId: randomUUID(),
+      socketId,
+      name: trimmed,
+      score: 0,
+      streak: 0,
+      answered: false,
+      lastPoints: 0,
+      connected: true,
+    };
+    this.players.set(player.playerId, player);
     return { player };
   }
 
-  removePlayer(socketId) {
-    this.players.delete(socketId);
-    this.answersThisRound.delete(socketId);
+  getPlayerByToken(token) {
+    return this.players.get(token) || null;
+  }
+
+  removePlayer(playerId) {
+    this.players.delete(playerId);
+    this.answersThisRound.delete(playerId);
+  }
+
+  // Joueurs connectés (pour le lobby et les comptes de réponses).
+  connectedPlayers() {
+    return [...this.players.values()].filter((p) => p.connected);
   }
 
   playerList() {
-    return [...this.players.values()].map((p) => ({ id: p.id, name: p.name, score: p.score }));
+    return this.connectedPlayers().map((p) => ({ id: p.playerId, name: p.name, score: p.score }));
   }
 
-  // Classement décroissant.
+  // Classement décroissant (inclut les joueurs déconnectés qui gardent leur score).
   leaderboard(limit) {
     const sorted = [...this.players.values()].sort((a, b) => b.score - a.score);
     const arr = sorted.map((p, i) => ({
-      id: p.id,
+      id: p.playerId,
       name: p.name,
       score: p.score,
       lastPoints: p.lastPoints,
@@ -97,15 +124,15 @@ class Game {
   }
 
   // Enregistre la réponse d'un joueur. Retourne true si acceptée.
-  submitAnswer(socketId, answerIndex) {
+  submitAnswer(playerId, answerIndex) {
     if (this.state !== GameState.QUESTION) return false;
-    const player = this.players.get(socketId);
+    const player = this.players.get(playerId);
     if (!player || player.answered) return false;
     const q = this.currentQuestion;
     if (!q || answerIndex < 0 || answerIndex >= q.answers.length) return false;
 
     player.answered = true;
-    this.answersThisRound.set(socketId, {
+    this.answersThisRound.set(playerId, {
       answerIndex,
       timeMs: Date.now() - this.questionStartedAt,
     });
@@ -113,18 +140,18 @@ class Game {
   }
 
   allAnswered() {
-    return this.players.size > 0 && this.answersThisRound.size >= this.players.size;
+    const active = this.connectedPlayers();
+    return active.length > 0 && active.every((p) => this.answersThisRound.has(p.playerId));
   }
 
   // Calcule les points de la manche et met à jour les scores.
-  // Retourne les stats pour l'affichage (répartition des réponses).
   computeReveal() {
     const q = this.currentQuestion;
     const timeMs = q.time * 1000;
     const distribution = new Array(q.answers.length).fill(0);
 
-    for (const [socketId, player] of this.players) {
-      const ans = this.answersThisRound.get(socketId);
+    for (const [playerId, player] of this.players) {
+      const ans = this.answersThisRound.get(playerId);
       if (!ans) {
         player.streak = 0;
         player.lastPoints = 0;
@@ -152,13 +179,13 @@ class Game {
   }
 
   // Vue "réponse individuelle" envoyée à chaque joueur.
-  playerResult(socketId) {
-    const player = this.players.get(socketId);
+  playerResult(playerId) {
+    const player = this.players.get(playerId);
     if (!player) return null;
-    const ans = this.answersThisRound.get(socketId);
+    const ans = this.answersThisRound.get(playerId);
     const q = this.currentQuestion;
     const correct = ans ? ans.answerIndex === q.correctIndex : false;
-    const rank = this.leaderboard().find((p) => p.id === socketId)?.rank ?? null;
+    const rank = this.leaderboard().find((p) => p.id === playerId)?.rank ?? null;
     return {
       correct,
       answered: !!ans,
@@ -181,12 +208,14 @@ class Game {
 export class GameManager {
   constructor() {
     this.games = new Map(); // pin -> Game
-    this.socketIndex = new Map(); // socketId -> { pin, role }
+    this.socketIndex = new Map(); // socketId -> { pin, role, playerId? }
   }
 
   createGame(hostSocketId, quiz) {
     const pin = generatePin(this.games);
-    const game = new Game(pin, hostSocketId, this.normalizeQuiz(quiz));
+    const hostToken = randomUUID();
+    const game = new Game(pin, hostToken, this.normalizeQuiz(quiz));
+    game.hostSocketId = hostSocketId;
     this.games.set(pin, game);
     this.socketIndex.set(hostSocketId, { pin, role: "host" });
     return game;
@@ -194,13 +223,25 @@ export class GameManager {
 
   normalizeQuiz(quiz) {
     const questions = (quiz?.questions || [])
-      .map((q) => ({
-        text: String(q.text || "").slice(0, 200),
-        answers: (q.answers || []).slice(0, 4).map((a) => String(a || "").slice(0, 100)),
-        correctIndex: Number.isInteger(q.correctIndex) ? q.correctIndex : 0,
-        time: Math.min(Math.max(Number(q.time) || 20, 5), 120),
-      }))
-      .filter((q) => q.text && q.answers.filter(Boolean).length >= 2);
+      .map((q) => {
+        const type = q.type === "truefalse" ? "truefalse" : "quiz";
+        let answers = (q.answers || []).map((a) => String(a || "").slice(0, 100));
+        if (type === "truefalse") {
+          answers = ["Vrai", "Faux"];
+        } else {
+          answers = answers.slice(0, 4);
+        }
+        const image = typeof q.image === "string" && /^https?:\/\//i.test(q.image) ? q.image.slice(0, 500) : "";
+        return {
+          text: String(q.text || "").slice(0, 200),
+          answers,
+          correctIndex: Number.isInteger(q.correctIndex) ? q.correctIndex : 0,
+          time: Math.min(Math.max(Number(q.time) || 20, 5), 120),
+          type,
+          image,
+        };
+      })
+      .filter((q) => q.text && q.answers.filter(Boolean).length >= 2 && q.correctIndex < q.answers.length);
     return {
       title: String(quiz?.title || "Quiz").slice(0, 80),
       questions,
@@ -216,7 +257,7 @@ export class GameManager {
     if (!ref) return null;
     const game = this.games.get(ref.pin);
     if (!game) return null;
-    return { game, role: ref.role };
+    return { game, role: ref.role, playerId: ref.playerId };
   }
 
   joinGame(socketId, pin, name) {
@@ -225,12 +266,43 @@ export class GameManager {
     if (game.state !== GameState.LOBBY) return { error: "La partie a déjà commencé." };
     const res = game.addPlayer(socketId, name);
     if (res.error) return res;
-    this.socketIndex.set(socketId, { pin: game.pin, role: "player" });
+    this.socketIndex.set(socketId, { pin: game.pin, role: "player", playerId: res.player.playerId });
     return { game, player: res.player };
   }
 
-  // Nettoie à la déconnexion. Retourne le contexte pour notifier les autres.
-  handleDisconnect(socketId) {
+  // Reconnexion d'un joueur via son jeton.
+  rejoinPlayer(socketId, pin, token) {
+    const game = this.getGame(pin);
+    if (!game) return { error: "Partie introuvable." };
+    const player = game.getPlayerByToken(token);
+    if (!player) return { error: "Session expirée." };
+    // Bascule le socket courant vers le joueur existant (score conservé).
+    if (player.socketId && player.socketId !== socketId) {
+      this.socketIndex.delete(player.socketId);
+    }
+    player.socketId = socketId;
+    player.connected = true;
+    this.socketIndex.set(socketId, { pin: game.pin, role: "player", playerId: player.playerId });
+    return { game, player };
+  }
+
+  // Reconnexion de l'hôte via son jeton.
+  rejoinHost(socketId, pin, token) {
+    const game = this.getGame(pin);
+    if (!game) return { error: "Partie introuvable." };
+    if (game.hostToken !== token) return { error: "Jeton hôte invalide." };
+    if (game.hostSocketId && game.hostSocketId !== socketId) {
+      this.socketIndex.delete(game.hostSocketId);
+    }
+    game.hostSocketId = socketId;
+    game.hostConnected = true;
+    this.socketIndex.set(socketId, { pin: game.pin, role: "host" });
+    return { game };
+  }
+
+  // Marque une socket comme déconnectée sans supprimer l'entité (grâce à la
+  // période de grâce gérée côté serveur). Retourne le contexte.
+  markDisconnected(socketId) {
     const ref = this.socketIndex.get(socketId);
     this.socketIndex.delete(socketId);
     if (!ref) return null;
@@ -238,13 +310,15 @@ export class GameManager {
     if (!game) return null;
 
     if (ref.role === "host") {
-      // L'hôte part : la partie est détruite.
-      game.clearTimer();
-      this.games.delete(ref.pin);
-      return { game, role: "host", destroyed: true };
+      game.hostConnected = false;
+      return { game, role: "host" };
     }
-    game.removePlayer(socketId);
-    return { game, role: "player" };
+    const player = game.players.get(ref.playerId);
+    if (player) {
+      player.connected = false;
+      player.socketId = null;
+    }
+    return { game, role: "player", playerId: ref.playerId };
   }
 
   destroyGame(pin) {
