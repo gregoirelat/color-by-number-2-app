@@ -222,26 +222,39 @@ export class GameManager {
   }
 
   normalizeQuiz(quiz) {
+    const validUrl = (u) => (typeof u === "string" && /^https?:\/\//i.test(u) ? u.slice(0, 500) : "");
     const questions = (quiz?.questions || [])
       .map((q) => {
         const type = q.type === "truefalse" ? "truefalse" : "quiz";
-        let answers = (q.answers || []).map((a) => String(a || "").slice(0, 100));
+        let answers, answerImages;
         if (type === "truefalse") {
           answers = ["Vrai", "Faux"];
+          answerImages = ["", ""];
         } else {
-          answers = answers.slice(0, 4);
+          answers = (q.answers || []).slice(0, 4).map((a) => String(a || "").slice(0, 100));
+          const rawImg = q.answerImages || [];
+          answerImages = answers.map((_, i) => validUrl(rawImg[i]));
         }
-        const image = typeof q.image === "string" && /^https?:\/\//i.test(q.image) ? q.image.slice(0, 500) : "";
         return {
           text: String(q.text || "").slice(0, 200),
           answers,
+          answerImages,
           correctIndex: Number.isInteger(q.correctIndex) ? q.correctIndex : 0,
           time: Math.min(Math.max(Number(q.time) || 20, 5), 120),
           type,
-          image,
+          image: validUrl(q.image),
         };
       })
-      .filter((q) => q.text && q.answers.filter(Boolean).length >= 2 && q.correctIndex < q.answers.length);
+      // Une réponse est "présente" si elle a du texte OU une image.
+      .filter((q) => {
+        const present = q.answers.filter((t, i) => t || q.answerImages[i]).length;
+        return (
+          q.text &&
+          present >= 2 &&
+          q.correctIndex < q.answers.length &&
+          (q.answers[q.correctIndex] || q.answerImages[q.correctIndex])
+        );
+      });
     return {
       title: String(quiz?.title || "Quiz").slice(0, 80),
       questions,

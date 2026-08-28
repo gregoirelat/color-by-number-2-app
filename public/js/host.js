@@ -117,10 +117,14 @@ socket.on("game:question", (q) => {
   const wrap = el("answers");
   wrap.innerHTML = "";
   const labels = q.type === "truefalse" ? ["Vrai", "Faux"] : SHAPES;
+  const images = q.answerImages || [];
   q.answers.forEach((a, i) => {
     const d = document.createElement("div");
     d.className = `answer a${i}`;
-    d.innerHTML = `<span class="shape">${labels[i]}</span><span>${escapeHtml(a)}</span>`;
+    d.innerHTML = `
+      <span class="shape">${labels[i]}</span>
+      ${images[i] ? `<img class="answer-img" src="${escapeAttr(images[i])}" alt="" />` : ""}
+      <span>${escapeHtml(a)}</span>`;
     wrap.appendChild(d);
   });
 
@@ -147,12 +151,14 @@ socket.on("game:reveal", (r) => {
   const wrap = el("revealAnswers");
   wrap.innerHTML = "";
   const labels = r.answers.length === 2 && r.answers[0] === "Vrai" ? ["Vrai", "Faux"] : SHAPES;
+  const images = r.answerImages || [];
   r.answers.forEach((a, i) => {
     const d = document.createElement("div");
     const isCorrect = i === r.correctIndex;
     d.className = `answer a${i} ${isCorrect ? "correct" : "dim"}`;
     d.innerHTML = `
       <span class="shape">${labels[i]}</span>
+      ${images[i] ? `<img class="answer-img" src="${escapeAttr(images[i])}" alt="" />` : ""}
       <span>${escapeHtml(a)} ${isCorrect ? "✔️" : ""}</span>
       <span class="count">${r.distribution[i]}</span>`;
     wrap.appendChild(d);
@@ -204,4 +210,9 @@ function renderPodium(list) {
 
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+}
+
+// Pour insérer une URL dans un attribut src en toute sécurité.
+function escapeAttr(s) {
+  return String(s).replace(/[&"'<>]/g, (c) => ({ "&": "&amp;", '"': "&quot;", "'": "&#39;", "<": "&lt;", ">": "&gt;" })[c]);
 }

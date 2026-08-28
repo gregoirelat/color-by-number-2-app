@@ -23,8 +23,8 @@ const el = (id) => document.getElementById(id);
 
 function newQuestion(type = "quiz") {
   return type === "truefalse"
-    ? { type: "truefalse", text: "", answers: ["Vrai", "Faux"], correctIndex: 0, time: 20, image: "" }
-    : { type: "quiz", text: "", answers: ["", "", "", ""], correctIndex: 0, time: 20, image: "" };
+    ? { type: "truefalse", text: "", answers: ["Vrai", "Faux"], answerImages: ["", ""], correctIndex: 0, time: 20, image: "" }
+    : { type: "quiz", text: "", answers: ["", "", "", ""], answerImages: ["", "", "", ""], correctIndex: 0, time: 20, image: "" };
 }
 
 // ---- Rendu des questions ----
@@ -56,7 +56,10 @@ function render() {
           <div class="q-answer-row">
             <span class="swatch" style="background:${SWATCHES[ai]}"></span>
             <input type="radio" name="correct-${qi}" ${q.correctIndex === ai ? "checked" : ""} data-correct="${qi}-${ai}" title="Bonne réponse" />
-            <input placeholder="Réponse ${SHAPES[ai]}" value="${escapeHtml(a)}" data-answer="${qi}-${ai}" ${isTF ? "disabled" : ""} />
+            <div class="q-answer-inputs">
+              <input placeholder="Réponse ${SHAPES[ai]}" value="${escapeHtml(a)}" data-answer="${qi}-${ai}" ${isTF ? "disabled" : ""} />
+              <input class="ans-img" placeholder="URL image de la réponse (option.)" value="${escapeHtml((q.answerImages && q.answerImages[ai]) || "")}" data-answerimg="${qi}-${ai}" ${isTF ? "disabled" : ""} />
+            </div>
           </div>`
           )
           .join("")}
@@ -84,6 +87,13 @@ function attachHandlers() {
       questions[qi].answers[ai] = e.target.value;
     };
   });
+  document.querySelectorAll("[data-answerimg]").forEach((inp) => {
+    inp.oninput = (e) => {
+      const [qi, ai] = e.target.dataset.answerimg.split("-").map(Number);
+      if (!questions[qi].answerImages) questions[qi].answerImages = [];
+      questions[qi].answerImages[ai] = e.target.value.trim();
+    };
+  });
   document.querySelectorAll("[data-correct]").forEach((inp) => {
     inp.onchange = (e) => {
       const [qi, ai] = e.target.dataset.correct.split("-").map(Number);
@@ -98,7 +108,10 @@ function attachHandlers() {
       next.text = cur.text;
       next.time = cur.time;
       next.image = cur.image;
-      if (e.target.value === "quiz" && cur.type === "quiz") next.answers = cur.answers;
+      if (e.target.value === "quiz" && cur.type === "quiz") {
+        next.answers = cur.answers;
+        next.answerImages = cur.answerImages || ["", "", "", ""];
+      }
       questions[qi] = next;
       render();
     };
@@ -121,20 +134,34 @@ function escapeHtml(s) {
 function validate() {
   const title = el("quizTitle").value.trim();
   if (!title) return "Donne un titre au quiz.";
+  const isUrl = (u) => !u || /^https?:\/\//i.test(u);
   const clean = questions
-    .map((q) => ({
-      type: q.type === "truefalse" ? "truefalse" : "quiz",
-      text: q.text.trim(),
-      answers: (q.type === "truefalse" ? ["Vrai", "Faux"] : q.answers).map((a) => a.trim()),
-      correctIndex: q.correctIndex,
-      time: q.time,
-      image: (q.image || "").trim(),
-    }))
-    .filter((q) => q.text && q.answers.filter(Boolean).length >= 2);
-  if (clean.length === 0) return "Ajoute au moins une question valide (énoncé + 2 réponses).";
+    .map((q) => {
+      const isTF = q.type === "truefalse";
+      const answers = (isTF ? ["Vrai", "Faux"] : q.answers).map((a) => a.trim());
+      const answerImages = (isTF ? ["", ""] : q.answerImages || []).map((u) => (u || "").trim());
+      // aligne la longueur des images sur celle des réponses
+      while (answerImages.length < answers.length) answerImages.push("");
+      return {
+        type: isTF ? "truefalse" : "quiz",
+        text: q.text.trim(),
+        answers,
+        answerImages: answerImages.slice(0, answers.length),
+        correctIndex: q.correctIndex,
+        time: q.time,
+        image: (q.image || "").trim(),
+      };
+    })
+    // une réponse compte si elle a du texte OU une image
+    .filter((q) => q.text && q.answers.filter((t, i) => t || q.answerImages[i]).length >= 2);
+  if (clean.length === 0) return "Ajoute au moins une question valide (énoncé + 2 réponses avec texte ou image).";
   for (const q of clean) {
-    if (!q.answers[q.correctIndex]) return `La bonne réponse de « ${q.text} » est vide.`;
-    if (q.image && !/^https?:\/\//i.test(q.image)) return `L'URL d'image de « ${q.text} » doit commencer par http(s)://.`;
+    if (!q.answers[q.correctIndex] && !q.answerImages[q.correctIndex])
+      return `La bonne réponse de « ${q.text} » est vide (ni texte ni image).`;
+    if (!isUrl(q.image)) return `L'URL d'image de « ${q.text} » doit commencer par http(s)://.`;
+    for (let i = 0; i < q.answerImages.length; i++) {
+      if (!isUrl(q.answerImages[i])) return `Une URL d'image de réponse de « ${q.text} » doit commencer par http(s)://.`;
+    }
   }
   return { title, questions: clean };
 }

@@ -96,10 +96,23 @@ socket.on("game:question", (q) => {
   wrap.classList.toggle("tf", q.type === "truefalse");
   wrap.innerHTML = "";
   const labels = q.type === "truefalse" ? ["Vrai", "Faux"] : SHAPES;
+  const texts = q.answers || [];
+  const images = q.answerImages || [];
+  // Si au moins une réponse a une image, on affiche image + texte sur les
+  // boutons (sinon on garde les grandes cibles « formes » classiques).
+  const hasImages = images.some(Boolean);
+  wrap.classList.toggle("rich", hasImages);
   for (let i = 0; i < q.answersCount; i++) {
     const btn = document.createElement("button");
     btn.className = `a${i}`;
-    btn.textContent = labels[i];
+    if (hasImages) {
+      btn.innerHTML = `
+        <span class="pa-shape">${labels[i]}</span>
+        ${images[i] ? `<img class="pa-img" src="${escapeAttr(images[i])}" alt="" />` : ""}
+        ${texts[i] ? `<span class="pa-text">${escapeHtml(texts[i])}</span>` : ""}`;
+    } else {
+      btn.textContent = labels[i];
+    }
     btn.onclick = () => socket.emit("player:answer", { answerIndex: i });
     wrap.appendChild(btn);
   }
@@ -152,6 +165,13 @@ socket.on("game:end", (r) => {
 
 function medal(rank) {
   return { 1: "🥇", 2: "🥈", 3: "🥉" }[rank] || "🎮";
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+}
+function escapeAttr(s) {
+  return String(s).replace(/[&"'<>]/g, (c) => ({ "&": "&amp;", '"': "&quot;", "'": "&#39;", "<": "&lt;", ">": "&gt;" })[c]);
 }
 
 socket.on("game:kicked", () => {

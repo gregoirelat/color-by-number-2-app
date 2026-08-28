@@ -144,6 +144,36 @@ select {
   font-size: 2rem;
 }
 
+/* Boutons joueur avec image + texte (mode réponses illustrées) */
+.player-answers.rich button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  font-size: 1rem;
+  padding: 0.5rem;
+}
+
+.player-answers.rich .pa-shape {
+  font-size: 1.4rem;
+}
+
+.player-answers.rich .pa-img {
+  max-height: 45%;
+  max-width: 90%;
+  object-fit: contain;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.player-answers.rich .pa-text {
+  font-size: 1rem;
+  font-weight: 700;
+  text-align: center;
+  line-height: 1.1;
+}
+
 .brand {
   font-size: clamp(2rem, 6vw, 3.4rem);
   font-weight: 800;
@@ -331,6 +361,14 @@ select {
   font-size: 1rem;
 }
 
+.answer .answer-img {
+  height: 64px;
+  max-width: 120px;
+  object-fit: contain;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.15);
+}
+
 /* Boutons de réponse joueur (grande cible tactile, sans texte) */
 .player-answers {
   display: grid;
@@ -481,6 +519,18 @@ select {
 .q-answer-row input[type="radio"] {
   width: auto;
   accent-color: var(--accent);
+}
+
+.q-answer-inputs {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.q-answer-inputs .ans-img {
+  font-size: 0.85rem;
+  padding: 0.5rem 0.7rem;
 }
 
 .q-meta {

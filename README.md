@@ -6,7 +6,7 @@ Application de quiz en temps réel, façon **Kahoot**, conçue pour être jouée
 
 - **Éditeur de quiz** dans le navigateur :
   - questions **QCM** (4 réponses) ou **Vrai / Faux** ;
-  - **image** optionnelle par question (URL) ;
+  - **image** optionnelle sur la question **et sur chaque réponse** (URL) — une réponse peut être une image seule ;
   - bonne réponse et **chrono** réglables ;
   - **bibliothèque locale** : enregistrer, recharger et supprimer ses quiz (stockés dans le navigateur).
 - **Hébergement d'une partie** : PIN à 6 chiffres + **QR code** de connexion affiché à l'écran.
