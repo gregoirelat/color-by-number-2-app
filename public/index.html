@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Kahoot Clone — Accueil</title>
+    <link rel="stylesheet" href="/css/style.css" />
+  </head>
+  <body>
+    <div class="container">
+      <h1 class="brand">🎉 Quiz Party</h1>
+      <p class="subtitle">Un clone de Kahoot en temps réel — jusqu'à une centaine de joueurs, connexion par QR code.</p>
+
+      <!-- Choix initial -->
+      <div id="home" class="row" style="justify-content: center; margin-bottom: 2rem">
+        <button class="btn-primary btn-big" id="btnHostMode">🖥️ Animer une partie</button>
+        <a href="/play"><button class="btn-ghost btn-big">📱 Rejoindre</button></a>
+      </div>
+
+      <!-- Éditeur de quiz (mode hôte) -->
+      <div id="editor" class="hidden">
+        <!-- Bibliothèque de quiz sauvegardés -->
+        <div class="card" style="margin-bottom: 1.5rem">
+          <div class="row" style="justify-content: space-between; align-items: center">
+            <strong>📚 Mes quiz</strong>
+            <button class="btn-ghost" id="btnSaveQuiz" style="padding: 0.5rem 1rem">💾 Enregistrer</button>
+          </div>
+          <div id="library" class="row" style="margin-top: 0.8rem"></div>
+          <p class="small" id="libEmpty">Aucun quiz enregistré. Les quiz sont stockés dans ce navigateur.</p>
+        </div>
+
+        <div class="card" style="margin-bottom: 1.5rem">
+          <label class="small">Titre du quiz</label>
+          <input id="quizTitle" value="Mon super quiz" />
+        </div>
+
+        <div id="questions" class="q-editor"></div>
+
+        <div class="row" style="justify-content: space-between">
+          <button class="btn-ghost" id="btnAddQuestion">➕ Ajouter une question</button>
+          <div class="row">
+            <button class="btn-ghost" id="btnLoadSample">Charger un exemple</button>
+            <button class="btn-primary btn-big" id="btnLaunch">🚀 Lancer la partie</button>
+          </div>
+        </div>
+        <p class="status-line" id="editorStatus"></p>
+      </div>
+    </div>
+
+    <script src="/js/quiz-editor.js"></script>
+  </body>
+</html>

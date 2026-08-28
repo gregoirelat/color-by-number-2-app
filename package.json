@@ -1,0 +1,19 @@
+{
+  "name": "kahoot-clone",
+  "version": "1.0.0",
+  "description": "Un clone de Kahoot en temps réel, jouable à une centaine de personnes, connexion par QR code.",
+  "type": "module",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "qrcode": "^1.5.4",
+    "socket.io": "^4.7.5"
+  }
+}
